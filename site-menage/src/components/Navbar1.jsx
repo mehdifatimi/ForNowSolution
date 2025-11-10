@@ -11,11 +11,21 @@ export default function Navbar1() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(localStorage.getItem('user') || localStorage.getItem('adminToken')));
   const [isLangOpen, setIsLangOpen] = useState(false);
-  const handleChangeLanguage = (lng) => {
+  const handleChangeLanguage = (lng, event) => {
+    // Prevent event propagation
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
+    // Close dropdown immediately when language is selected
+    setIsLangOpen(false);
+    
+    // Change language after closing dropdown
     try {
       i18n.changeLanguage(lng);
-    } finally {
-      setIsLangOpen(false);
+    } catch (error) {
+      console.error('Error changing language:', error);
     }
   };
   const location = useLocation();
@@ -80,16 +90,41 @@ export default function Navbar1() {
           closeMenu();
         }
       }
+      
+      // Close language dropdown when clicking outside (for both mobile and desktop)
+      if (isLangOpen) {
+        const mobileLangBtn = document.querySelector('.navbar1__mobile-lang-btn');
+        const mobileLangDropdown = document.querySelector('.navbar1__mobile-lang-dropdown');
+        const desktopLangBtn = document.querySelector('.lang-btn');
+        const desktopLangDropdown = document.querySelector('.navbar1__links .language-switcher-item > div[style*="position"]');
+        const desktopLangItem = document.querySelector('.language-switcher-item');
+        
+        // Check if click is inside any language-related element
+        const clickedInsideMobile = mobileLangBtn?.contains(event.target) || 
+                                   mobileLangDropdown?.contains(event.target);
+        
+        const clickedInsideDesktop = desktopLangBtn?.contains(event.target) || 
+                                    desktopLangDropdown?.contains(event.target) ||
+                                    desktopLangItem?.contains(event.target);
+        
+        // Close if click is outside both mobile and desktop language elements
+        if (!clickedInsideMobile && !clickedInsideDesktop) {
+          setIsLangOpen(false);
+        }
+      }
     };
 
     const handleKeyDown = (event) => {
       if (isOpen && event.key === 'Escape') {
         closeMenu();
       }
+      if (isLangOpen && event.key === 'Escape') {
+        setIsLangOpen(false);
+      }
     };
 
-    // Add event listeners when menu is open
-    if (isOpen) {
+    // Add event listeners when menu or language dropdown is open
+    if (isOpen || isLangOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
@@ -101,7 +136,7 @@ export default function Navbar1() {
       document.removeEventListener('touchstart', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, isLangOpen]);
 
   useEffect(() => {
     // Handle scroll effect
@@ -141,6 +176,15 @@ export default function Navbar1() {
 
   // Determine if we're in RTL mode (Arabic)
   const isRTL = i18n.language === 'ar';
+
+  // Get current language code (FR, AR, EN)
+  const getCurrentLangCode = () => {
+    const lang = i18n.language || 'fr';
+    const langCode = lang.split(/[-_]/)[0].toLowerCase();
+    if (langCode === 'ar') return 'AR';
+    if (langCode === 'en') return 'EN';
+    return 'FR';
+  };
 
   return (
     <header
@@ -184,6 +228,73 @@ export default function Navbar1() {
         >
           <span className="navbar1__title">ForNowSolution</span>
         </Link>
+
+        {/* Mobile Language Switcher Button - appears only on mobile */}
+        <button
+          type="button"
+          className="navbar1__mobile-lang-btn"
+          title={t('nav.languages', 'Languages')}
+          aria-label={t('nav.languages', 'Languages')}
+          aria-expanded={isLangOpen}
+          onClick={() => setIsLangOpen(v => !v)}
+        >
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width="18" 
+            height="18" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+            className="mobile-lang-globe-icon"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20" />
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          </svg>
+          <span className="mobile-lang-code">{getCurrentLangCode()}</span>
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width="14" 
+            height="14" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2.5" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+            className={`mobile-lang-chevron ${isLangOpen ? 'open' : ''}`}
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+          {/* Language Dropdown Menu */}
+          {isLangOpen && (
+            <div className="navbar1__mobile-lang-dropdown">
+              {[
+                { code: 'ar', label: 'العربية', codeLabel: 'AR' },
+                { code: 'fr', label: 'Français', codeLabel: 'FR' },
+                { code: 'en', label: 'English', codeLabel: 'EN' },
+              ].map(({ code, label, codeLabel }) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={(e) => handleChangeLanguage(code, e)}
+                  className={`mobile-lang-option ${i18n.language.startsWith(code) ? 'active' : ''}`}
+                >
+                  <span className="mobile-lang-option-label">{label}</span>
+                  <span className="mobile-lang-option-code">{codeLabel}</span>
+                  {i18n.language.startsWith(code) && (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6 9 17l-5-5"/>
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </button>
 
         {/* Navigation menu - links in normal order */}
         <nav className={`navbar1__nav ${isRTL ? 'rtl-nav' : ''}`} aria-label="Navigation principale">
@@ -242,7 +353,7 @@ export default function Navbar1() {
                         ].map(({code,label}) => (
                           <button key={code}
                             type="button"
-                            onClick={() => handleChangeLanguage(code)}
+                            onClick={(e) => handleChangeLanguage(code, e)}
                             className={`lang-option ${i18n.language.startsWith(code) ? 'active' : ''}`}
                             style={{
                               display:'flex', alignItems:'center', justifyContent:'space-between',

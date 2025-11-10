@@ -27,6 +27,12 @@
     padding-top: 60px; /* Smaller navbar height on mobile */
   }
   
+  /* Remove padding-top for Home page on mobile to eliminate gap between Navbar and Hero */
+  .page-transition:has(.Home),
+  .page-transition > .Home {
+    padding-top: 0 !important;
+  }
+  
   .admin-page {
     padding-top: 0 !important;
   }

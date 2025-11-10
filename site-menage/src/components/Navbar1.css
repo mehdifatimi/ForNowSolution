@@ -237,10 +237,14 @@
 }
 
 /* RTL Visual Order: Logo → Menu/Links → Icons (Burger hidden on desktop) */
-/* RTL Support - Logo positioning (first in RTL) */
+/* RTL Support - Logo positioning (first in RTL) - but keep centered */
 .navbar1.rtl .navbar1__brand,
 .navbar1__brand.rtl-brand {
   order: 1; /* First after burger (which is hidden on desktop) */
+  justify-content: center !important;
+  text-align: center !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 /* RTL Support - Navigation menu positioning (after logo in RTL) */
@@ -284,12 +288,16 @@
 .navbar1__brand {
   display: inline-flex !important;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   color: var(--color-text);
   text-decoration: none;
   font-weight: 800;
   visibility: visible !important;
   opacity: 1 !important;
+  text-align: center;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .navbar1__logo {
@@ -410,6 +418,7 @@
   .navbar1__brand {
     position: absolute !important;
     left: 50% !important;
+    right: auto !important;
     top: 50% !important;
     transform: translate(-50%, -50%) !important;
     flex: 0 0 auto !important;
@@ -418,17 +427,29 @@
     align-items: center !important;
     width: auto !important;
     margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     z-index: 5 !important;
+    text-align: center !important;
   }
   
-  /* RTL Support - Center logo in RTL mode on mobile */
+  /* RTL Support - Center logo in RTL mode on mobile - always centered (same as LTR) */
   .navbar1.rtl .navbar1__brand,
   .navbar1__brand.rtl-brand,
   [dir="rtl"] .navbar1__brand {
+    position: absolute !important;
     left: 50% !important;
     right: auto !important;
+    top: 50% !important;
     transform: translate(-50%, -50%) !important;
     justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: auto !important;
+    z-index: 5 !important;
   }
   
   /* Adjust navbar inner layout for mobile - ensure proper spacing */
@@ -523,10 +544,25 @@
     opacity: 1 !important;
   }
   
-  /* Reset logo positioning on desktop */
+  /* Reset logo positioning on desktop - but keep it centered */
   .navbar1__brand {
-    flex: 0 0 auto;
-    justify-content: flex-start;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Ensure logo stays centered in RTL mode on desktop */
+  .navbar1.rtl .navbar1__brand,
+  [dir="rtl"] .navbar1__brand {
+    flex: 1 !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
   
   /* Reset navbar inner layout on desktop */
@@ -875,6 +911,33 @@
   /* Ensure logo is perfectly centered and doesn't overlap */
   .navbar1__brand {
     pointer-events: auto !important;
+    position: absolute !important;
+    left: 50% !important;
+    right: auto !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: auto !important;
+    z-index: 5 !important;
+    text-align: center !important;
+  }
+  
+  /* Ensure logo stays centered in RTL mode on mobile - same as LTR */
+  .navbar1.rtl .navbar1__brand,
+  [dir="rtl"] .navbar1__brand {
+    position: absolute !important;
+    left: 50% !important;
+    right: auto !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: auto !important;
+    z-index: 5 !important;
+    text-align: center !important;
   }
   
   /* تحسينات القائمة المنبثقة للشاشات الصغيرة */
@@ -953,6 +1016,20 @@
     display: flex !important;
     justify-content: center;
     align-items: center;
+    text-align: center;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Ensure logo stays centered in RTL mode on tablet */
+  .navbar1.rtl .navbar1__brand,
+  [dir="rtl"] .navbar1__brand {
+    flex: 1 !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
   
   /* Adjust navbar inner layout for tablet and mobile */
@@ -1246,5 +1323,218 @@ body > .App > .navbar1 {
 .navbar1__links {
   visibility: visible !important;
   opacity: 1 !important;
+}
+
+/* Mobile Language Switcher Button - Custom Design */
+.navbar1__mobile-lang-btn {
+  display: none; /* Hidden by default, shown only on mobile */
+  position: absolute;
+  right: 12px; /* Default: right side for LTR (FR/EN) */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  z-index: 10;
+  flex-direction: row;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+/* Move button to left side when Arabic (RTL) is selected */
+.navbar1.rtl .navbar1__mobile-lang-btn,
+[dir="rtl"] .navbar1__mobile-lang-btn {
+  right: auto;
+  left: 12px; /* Left side for RTL (AR) */
+}
+
+.navbar1__mobile-lang-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.navbar1__mobile-lang-btn:active {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transform: translateY(-50%) scale(0.98);
+}
+
+/* Globe Icon */
+.mobile-lang-globe-icon {
+  color: rgb(56, 9, 223);
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+/* Language Code */
+.mobile-lang-code {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgb(56, 9, 223);
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Chevron Down Icon */
+.mobile-lang-chevron {
+  color: rgb(56, 9, 223);
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+  width: 12px;
+  height: 12px;
+}
+
+.mobile-lang-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Language Dropdown Menu */
+.navbar1__mobile-lang-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  z-index: 100000;
+  animation: fadeInDown 0.2s ease-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Language Option */
+.mobile-lang-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  color: #0f172a;
+  width: 100%;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.mobile-lang-option:hover {
+  background: #f8fafc;
+}
+
+.mobile-lang-option.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.mobile-lang-option-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.mobile-lang-option-code {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.5px;
+}
+
+.mobile-lang-option.active .mobile-lang-option-code {
+  color: #1d4ed8;
+}
+
+/* RTL Support for Mobile Language Button - Already handled above */
+/* Dropdown positioning for RTL */
+.navbar1.rtl .navbar1__mobile-lang-dropdown,
+[dir="rtl"] .navbar1__mobile-lang-dropdown {
+  right: auto;
+  left: 0;
+}
+
+.navbar1.rtl .mobile-lang-option,
+[dir="rtl"] .mobile-lang-option {
+  text-align: right;
+}
+
+/* Show mobile language button only on mobile */
+@media (max-width: 768px) {
+  .navbar1__mobile-lang-btn {
+    display: flex !important;
+    position: absolute !important;
+    right: 12px !important; /* Default: right for LTR (FR/EN) */
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+  }
+  
+  /* Move button to left when Arabic (RTL) is selected */
+  .navbar1.rtl .navbar1__mobile-lang-btn,
+  [dir="rtl"] .navbar1__mobile-lang-btn {
+    right: auto !important;
+    left: 12px !important; /* Left side for RTL (AR) */
+  }
+  
+  /* Ensure logo stays perfectly centered - no margins that affect centering */
+  .navbar1__brand {
+    position: absolute !important;
+    left: 50% !important;
+    right: auto !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: auto !important;
+    z-index: 5 !important;
+  }
+  
+  /* Ensure logo stays centered in RTL mode - same centering as LTR */
+  .navbar1.rtl .navbar1__brand,
+  [dir="rtl"] .navbar1__brand {
+    position: absolute !important;
+    left: 50% !important;
+    right: auto !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: auto !important;
+    z-index: 5 !important;
+  }
+}
+
+/* Hide on desktop and tablet */
+@media (min-width: 769px) {
+  .navbar1__mobile-lang-btn {
+    display: none !important;
+  }
 }
 

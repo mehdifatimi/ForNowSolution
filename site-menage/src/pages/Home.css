@@ -4,6 +4,41 @@
   background: #ffffff; 
   line-height: 1.6; 
 }
+
+/* Remove unwanted spacing between Navbar and Hero on mobile */
+@media (max-width: 768px) {
+  /* Remove padding-top from page-transition wrapper for Home page on mobile */
+  .page-transition:has(.Home),
+  .page-transition > .Home {
+    padding-top: 0 !important;
+  }
+  
+  /* Ensure Home container starts from top */
+  .Home {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+  
+  /* Make hero section start directly below navbar - no top padding/margin */
+  .home-hero {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    top: 0 !important;
+  }
+  
+  /* Ensure hero background starts from top */
+  .hero-background {
+    top: 0 !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+  
+  /* Remove any gap between navbar and hero */
+  body .Home .home-hero {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+}
 * { box-sizing: border-box; }
 img { 
   max-width: 100%; 
@@ -30,6 +65,7 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   color: #ffffff;
   overflow: hidden;
   box-sizing: border-box;
+  margin-top: 0;
 }
 
 /* Animated Background */
@@ -80,6 +116,20 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
+}
+
+/* Add separator line below buttons */
+.category-buttons-container::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 600px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.3);
+  z-index: 1;
 }
 
 .category-buttons-container {
@@ -350,27 +400,110 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 
 @media (max-width: 768px) {
   .home-hero {
-    padding: 40px 16px 120px;
+    padding: 0 16px 120px;
     min-height: 100vh;
+    margin-top: 0 !important;
   }
   
   .category-buttons-container,
   .service-buttons-container {
-    bottom: 80px;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
     gap: 8px;
     padding: 10px 12px;
     max-width: calc(100% - 24px);
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: auto;
+    justify-items: center;
+    align-items: center;
+    overflow: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Hide scrollbar on mobile since we're using grid now */
+  .category-buttons-container::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .category-buttons-container {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  /* First 3 buttons in first row - take full width of their grid cell */
+  .category-button:nth-child(1),
+  .category-button:nth-child(2),
+  .category-button:nth-child(3) {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Next 2 buttons in second row - positioned in columns 2 and 3 to center them */
+  .category-button:nth-child(4) {
+    grid-column: 2 / 3;
+    width: 100%;
+    max-width: 100%;
+    justify-self: center;
+  }
+  
+  .category-button:nth-child(5) {
+    grid-column: 3 / 4;
+    width: 100%;
+    max-width: 100%;
+    justify-self: center;
+  }
+  
+  /* If there are more than 5 buttons, continue in grid from column 1 */
+  .category-button:nth-child(n+6) {
+    width: 100%;
+    max-width: 100%;
   }
   
   .category-button {
-    padding: 8px 16px;
+    padding: 10px 14px;
     font-size: 11px;
-    min-height: 40px;
-    border-radius: 20px;
+    min-height: 44px;
+    border-radius: 24px;
+    white-space: nowrap;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative;
+    z-index: 2;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .category-button.active {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+    border-color: rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.4) !important;
+    font-weight: 700;
+  }
+  
+  .category-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+  
+  .category-button:active {
+    transform: translateY(0) scale(0.98);
   }
   
   .service-label {
     font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    text-align: center;
   }
   
   .button-container {
@@ -398,22 +531,103 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   
   .category-buttons-container,
   .service-buttons-container {
-    bottom: 90px;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
     gap: 6px;
     padding: 8px 10px;
     max-width: calc(100% - 20px);
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-auto-rows: auto;
+    justify-items: center;
+    align-items: center;
+    overflow: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Hide scrollbar on mobile since we're using grid now */
+  .category-buttons-container::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .category-buttons-container {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  /* First 3 buttons in first row */
+  .category-button:nth-child(1),
+  .category-button:nth-child(2),
+  .category-button:nth-child(3) {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Next 2 buttons in second row - positioned in columns 2 and 3 to center them */
+  .category-button:nth-child(4) {
+    grid-column: 2 / 3;
+    width: 100%;
+    max-width: 100%;
+    justify-self: center;
+  }
+  
+  .category-button:nth-child(5) {
+    grid-column: 3 / 4;
+    width: 100%;
+    max-width: 100%;
+    justify-self: center;
+  }
+  
+  /* If there are more than 5 buttons, continue in grid */
+  .category-button:nth-child(n+6) {
+    width: 100%;
+    max-width: 100%;
   }
   
   .category-button {
-    padding: 8px 12px;
+    padding: 10px 12px;
     font-size: 10px;
-    min-height: 36px;
-    border-radius: 18px;
+    min-height: 42px;
+    border-radius: 22px;
+    white-space: nowrap;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative;
+    z-index: 2;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .category-button.active {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+    border-color: rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.4) !important;
+    font-weight: 700;
+  }
+  
+  .category-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+  
+  .category-button:active {
+    transform: translateY(0) scale(0.98);
   }
   
   .service-label {
     font-size: 10px;
+    font-weight: 600;
     letter-spacing: 0.2px;
+    text-align: center;
   }
   
   .button-container {
