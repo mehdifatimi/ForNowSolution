@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './AdminJardinageEmployees.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminJardinageEmployees({ token, onAuthError }) {
   const [items, setItems] = useState([]);
@@ -9,30 +8,56 @@ export default function AdminJardinageEmployees({ token, onAuthError }) {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
 
-  const getToken = () => token || localStorage.getItem('adminToken');
-
   const load = async () => {
     try {
       setLoading(true);
       setError('');
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/jardinage-employees`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Accept': 'application/json'
-        }
-      });
       
-      if (res.status === 401) {
-        if (onAuthError) onAuthError();
-        throw new Error('Non autorisé');
+      console.log('[AdminJardinageEmployees] Loading employees from Supabase...');
+      
+      // Load all employees with jardinage type, then filter in JavaScript
+      const { data: allEmployees, error: loadError } = await supabase
+        .from('employees')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (loadError) {
+        console.error('[AdminJardinageEmployees] Error loading employees:', loadError);
+        throw new Error(loadError.message || 'Erreur lors du chargement');
       }
       
-      const data = await res.json();
-      if (!res.ok || data?.success === false) throw new Error(data.message || 'Load failed');
-      setItems(data.data || []);
+      // Filter for jardinage employees (metadata->>'type' = 'jardinage')
+      // and non-validated (status != 'active' OR is_active != true)
+      const jardinageEmployees = Array.isArray(allEmployees) ? allEmployees.filter(emp => {
+        const metadata = emp.metadata || {};
+        const isJardinage = metadata.type === 'jardinage';
+        const isNotValidated = emp.status !== 'active' || emp.is_active !== true;
+        return isJardinage && isNotValidated;
+      }) : [];
+      
+      // Transform data to match expected format
+      const transformed = jardinageEmployees.map(emp => {
+        const metadata = emp.metadata || {};
+        return {
+          id: emp.id,
+          first_name: metadata.first_name || '',
+          last_name: metadata.last_name || '',
+          full_name: emp.full_name || `${metadata.first_name || ''} ${metadata.last_name || ''}`.trim(),
+          email: emp.email || '',
+          phone: emp.phone || '',
+          expertise: metadata.expertise || '',
+          location: metadata.location || '',
+          is_active: emp.is_active || false,
+          status: emp.status || 'pending',
+          ...emp
+        };
+      });
+      
+      console.log('[AdminJardinageEmployees] Loaded employees:', transformed.length);
+      setItems(transformed);
     } catch (e) {
-      setError(e.message);
+      console.error('[AdminJardinageEmployees] Exception loading:', e);
+      setError(e.message || 'Erreur lors du chargement');
     } finally {
       setLoading(false);
     }
@@ -49,81 +74,76 @@ export default function AdminJardinageEmployees({ token, onAuthError }) {
 
   const toggleActive = async (id, next) => {
     try {
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/jardinage-employees/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ is_active: !!next })
-      });
+      console.log('[AdminJardinageEmployees] Toggling active:', id, next);
       
-      if (res.status === 401) {
-        if (onAuthError) onAuthError();
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          is_active: !!next,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[AdminJardinageEmployees] Error toggling active:', error);
         return;
       }
       
-      if (res.ok) {
-        setItems(prev => prev.map(i => i.id === id ? { ...i, is_active: !!next } : i));
-      }
+      console.log('[AdminJardinageEmployees] Toggle successful');
+      setItems(prev => prev.map(i => i.id === id ? { ...i, is_active: !!next } : i));
     } catch (e) {
-      console.error('Error toggling active:', e);
+      console.error('[AdminJardinageEmployees] Exception toggling active:', e);
     }
   };
 
   const remove = async (id) => {
     if (!window.confirm('Supprimer cet employé ?')) return;
     try {
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/jardinage-employees/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Accept': 'application/json'
-        }
-      });
+      console.log('[AdminJardinageEmployees] Deleting employee:', id);
       
-      if (res.status === 401) {
-        if (onAuthError) onAuthError();
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[AdminJardinageEmployees] Error deleting employee:', error);
         return;
       }
       
-      if (res.ok) {
-        setItems(prev => prev.filter(i => i.id !== id));
-      }
+      console.log('[AdminJardinageEmployees] Delete successful');
+      setItems(prev => prev.filter(i => i.id !== id));
     } catch (e) {
-      console.error('Error removing employee:', e);
+      console.error('[AdminJardinageEmployees] Exception deleting employee:', e);
     }
   };
 
   const validateEmployee = async (id) => {
     try {
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/jardinage-employees-valid`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ employee_id: id })
-      });
-      if (res.status === 401) {
-        if (onAuthError) onAuthError();
+      console.log('[AdminJardinageEmployees] Validating employee:', id);
+      
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          status: 'active',
+          is_active: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[AdminJardinageEmployees] Error validating employee:', error);
+        alert(error.message || 'Validation échouée');
         return;
       }
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({message:'Erreur'}));
-        alert(err.message || 'Validation échouée');
-        return;
-      }
+      
+      console.log('[AdminJardinageEmployees] Validation successful');
       // Remove from current list after successful validation
       setItems(prev => prev.filter(i => i.id !== id));
       alert('Employé validé ✅');
     } catch (e) {
-      console.error('Validate error', e);
+      console.error('[AdminJardinageEmployees] Exception validating employee:', e);
+      alert('Erreur lors de la validation');
     }
   };
 
