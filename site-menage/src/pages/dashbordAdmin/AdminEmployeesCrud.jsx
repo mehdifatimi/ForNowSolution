@@ -1,45 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import './AdminCrud.css';
 import './AdminEmployeesCrud.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
+import { supabase } from '../../lib/supabase';
 
 // Helper function to get correct employee photo URL
 const getEmployeePhotoUrl = (employee) => {
-  if (!employee.photo) {
+  if (!employee.photo && !employee.photo_url) {
     return null;
   }
   
-  const rawP = String(employee.photo || '');
+  const photoPath = employee.photo_url || employee.photo;
+  const rawP = String(photoPath || '');
   const p = rawP.replace(/^"|"$/g,'').trim();
   
-  // If it's already an absolute URL
+  // If it's already an absolute URL (including Supabase Storage URLs)
   if (/^https?:\/\//i.test(p)) {
     return p;
   }
   
-  // If it's a path with initial slash
-  if (p.startsWith('/')) {
-    return `${API_BASE_URL}${p}`;
+  // If it's a Supabase Storage path, construct the public URL
+  if (p.startsWith('employees/') || p.includes('employees/')) {
+    const { data } = supabase.storage.from('employees').getPublicUrl(p);
+    return data?.publicUrl || null;
   }
   
-  // If it's a storage path
-  if (p.includes('storage/') || p.includes('public/')) {
-    const cleanPath = p.replace(/^public\//,'').replace(/^\/?storage\//,'');
-    return `${API_BASE_URL}/storage/${cleanPath}`;
+  // Fallback: try to get from Supabase Storage
+  try {
+    const { data } = supabase.storage.from('employees').getPublicUrl(p);
+    if (data?.publicUrl) {
+      return data.publicUrl;
+    }
+  } catch (e) {
+    // Ignore errors
   }
   
-  // Try different possible paths
-  const possibleUrls = [
-    `${API_BASE_URL}/storage/${p}`,
-    `${API_BASE_URL}/storage/app/public/${p}`,
-    `${API_BASE_URL}/public/storage/${p}`,
-    `${API_BASE_URL}/${p}`,
-    `${API_BASE_URL}/images/${p}`,
-    `${API_BASE_URL}/uploads/${p}`
-  ];
-  
-  return possibleUrls[0];
+  return null;
 };
 
 export default function AdminEmployeesCrud({ token, onAuthError }) {
@@ -56,15 +51,58 @@ export default function AdminEmployeesCrud({ token, onAuthError }) {
     try {
       setLoading(true);
       setError('');
-      const res = await fetch(`${API_BASE_URL}/api/admin/employees`, {
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      
+      console.log('[AdminEmployeesCrud] Loading employees from Supabase...');
+      
+      // Load all employees, then filter for housekeeping employees
+      const { data: allEmployees, error: loadError } = await supabase
+        .from('employees')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (loadError) {
+        console.error('[AdminEmployeesCrud] Error loading employees:', loadError);
+        throw new Error(loadError.message || 'Erreur lors du chargement');
+      }
+      
+      // Filter for housekeeping employees (metadata->>'type' = 'housekeeping' or null/undefined for default)
+      const housekeepingEmployees = Array.isArray(allEmployees) ? allEmployees.filter(emp => {
+        const metadata = emp.metadata || {};
+        const empType = metadata.type;
+        // Include housekeeping employees or employees without type (default to housekeeping)
+        return !empType || empType === 'housekeeping' || empType === 'houseKlean';
+      }) : [];
+      
+      // Transform data to match expected format
+      const transformed = housekeepingEmployees.map(emp => {
+        const metadata = emp.metadata || {};
+        return {
+          id: emp.id,
+          name: metadata.name || emp.full_name?.split(' ')[0] || '',
+          prenom: metadata.prenom || emp.full_name?.split(' ').slice(1).join(' ') || '',
+          full_name: emp.full_name || `${metadata.name || ''} ${metadata.prenom || ''}`.trim(),
+          age: metadata.age || null,
+          email: emp.email || '',
+          phone: emp.phone || '',
+          address: emp.address || metadata.adresse || '',
+          photo: emp.photo || emp.photo_url || null,
+          photo_url: emp.photo_url || emp.photo || null,
+          competency_id: metadata.competency_id || null,
+          competency_name: metadata.competency_name || null,
+          competency: metadata.competency || null,
+          jours_disponibles: metadata.availability || metadata.jours_disponibles || metadata.days || {},
+          status: emp.status || 'pending',
+          is_active: emp.is_active || false,
+          created_at: emp.created_at,
+          ...emp
+        };
       });
-      if (res.status === 401) { onAuthError?.(); return; }
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.data?.data || data.data || []);
-      setItems(list);
+      
+      console.log('[AdminEmployeesCrud] Loaded employees:', transformed.length);
+      setItems(transformed);
     } catch (e) {
-      setError("Impossible de charger les employés");
+      console.error('[AdminEmployeesCrud] Exception loading:', e);
+      setError(e.message || "Impossible de charger les employés");
     } finally {
       setLoading(false);
     }
@@ -72,13 +110,33 @@ export default function AdminEmployeesCrud({ token, onAuthError }) {
 
   const loadCompetencies = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/competencies`, { headers: { 'Accept': 'application/json' } });
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.data || []);
+      console.log('[AdminEmployeesCrud] Loading competencies from Supabase...');
+      
+      // Try to load from competencies table if it exists
+      const { data: competenciesData, error } = await supabase
+        .from('competencies')
+        .select('*');
+      
+      if (error) {
+        console.warn('[AdminEmployeesCrud] Competencies table not found or error:', error);
+        // If table doesn't exist, use empty map
+        setCompetencies({});
+        return;
+      }
+      
       const map = {};
-      list.forEach(c => { if (c?.id) map[c.id] = c.name || `#${c.id}`; });
+      if (Array.isArray(competenciesData)) {
+        competenciesData.forEach(c => { 
+          if (c?.id) map[c.id] = c.name || c.name_fr || c.name_ar || c.name_en || `#${c.id}`; 
+        });
+      }
+      
+      console.log('[AdminEmployeesCrud] Loaded competencies:', Object.keys(map).length);
       setCompetencies(map);
-    } catch {}
+    } catch (e) {
+      console.warn('[AdminEmployeesCrud] Exception loading competencies:', e);
+      setCompetencies({});
+    }
   };
 
   useEffect(() => { load(); loadCompetencies(); }, []);
@@ -86,16 +144,26 @@ export default function AdminEmployeesCrud({ token, onAuthError }) {
   const updateStatus = async (employeeId, status) => {
     try {
       setUpdatingId(employeeId);
-      const res = await fetch(`${API_BASE_URL}/api/admin/employees/${employeeId}/status`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      if (res.status === 401) { onAuthError?.(); return; }
-      if (!res.ok) throw new Error('Échec mise à jour du statut');
+      console.log('[AdminEmployeesCrud] Updating status:', employeeId, status);
+      
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          status: status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', employeeId);
+      
+      if (error) {
+        console.error('[AdminEmployeesCrud] Error updating status:', error);
+        throw new Error(error.message || 'Échec mise à jour du statut');
+      }
+      
+      console.log('[AdminEmployeesCrud] Status updated successfully');
       await load();
     } catch (e) {
-      alert(e.message);
+      console.error('[AdminEmployeesCrud] Exception updating status:', e);
+      alert(e.message || 'Erreur lors de la mise à jour');
     } finally {
       setUpdatingId(null);
     }
@@ -104,17 +172,29 @@ export default function AdminEmployeesCrud({ token, onAuthError }) {
   const validateEmployee = async (employeeId) => {
     try {
       setUpdatingId(employeeId);
-      const res = await fetch(`${API_BASE_URL}/api/admin/validate-employee/${employeeId}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-      });
-      if (res.status === 401) { onAuthError?.(); return; }
-      if (!res.ok) throw new Error("Échec de la validation");
+      console.log('[AdminEmployeesCrud] Validating employee:', employeeId);
+      
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          status: 'accepted',
+          is_active: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', employeeId);
+      
+      if (error) {
+        console.error('[AdminEmployeesCrud] Error validating employee:', error);
+        throw new Error(error.message || "Échec de la validation");
+      }
+      
+      console.log('[AdminEmployeesCrud] Employee validated successfully');
       await load();
       setFlash('Employé validé avec succès');
       setTimeout(() => setFlash(''), 3000);
     } catch (e) {
-      alert(e.message);
+      console.error('[AdminEmployeesCrud] Exception validating employee:', e);
+      alert(e.message || 'Erreur lors de la validation');
     } finally {
       setUpdatingId(null);
     }

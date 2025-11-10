@@ -4,8 +4,7 @@ import './AdminEmployeesCrud.css';
 import './AdminConfirmedEmployeesCrud.css';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminConfirmedEmployeesCrud({ token, onAuthError }) {
   const [items, setItems] = useState([]);
@@ -19,15 +18,62 @@ export default function AdminConfirmedEmployeesCrud({ token, onAuthError }) {
     try {
       setLoading(true);
       setError('');
-      const url = new URL(`${API_BASE_URL}/api/admin/confirmed-employees`);
-      if (q) url.searchParams.set('q', q);
-      const res = await fetch(url.toString(), { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
-      if (res.status === 401) { onAuthError?.(); return; }
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.data?.data || data.data || []);
-      setItems(list);
+      
+      console.log('[AdminConfirmedEmployeesCrud] Loading confirmed employees from Supabase...');
+      
+      // Load all employees, then filter for confirmed housekeeping employees
+      const { data: allEmployees, error: loadError } = await supabase
+        .from('employees')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      
+      if (loadError) {
+        console.error('[AdminConfirmedEmployeesCrud] Error loading employees:', loadError);
+        throw new Error(loadError.message || 'Erreur lors du chargement');
+      }
+      
+      // Filter for confirmed housekeeping employees
+      const confirmedEmployees = Array.isArray(allEmployees) ? allEmployees.filter(emp => {
+        const metadata = emp.metadata || {};
+        const empType = metadata.type;
+        // Include housekeeping employees or employees without type (default to housekeeping)
+        const isHousekeeping = !empType || empType === 'housekeeping' || empType === 'houseKlean';
+        // Must be confirmed/accepted
+        const isConfirmed = emp.status === 'accepted' || (emp.status === 'active' && emp.is_active === true);
+        return isHousekeeping && isConfirmed;
+      }) : [];
+      
+      // Transform data to match expected format
+      const transformed = confirmedEmployees.map(emp => {
+        const metadata = emp.metadata || {};
+        return {
+          id: emp.id,
+          name: metadata.name || emp.full_name?.split(' ')[0] || '',
+          prenom: metadata.prenom || emp.full_name?.split(' ').slice(1).join(' ') || '',
+          full_name: emp.full_name || `${metadata.name || ''} ${metadata.prenom || ''}`.trim(),
+          age: metadata.age || null,
+          email: emp.email || '',
+          phone: emp.phone || '',
+          adresse: emp.address || metadata.adresse || '',
+          photo: emp.photo || emp.photo_url || null,
+          photo_url: emp.photo_url || emp.photo || null,
+          competency_id: metadata.competency_id || null,
+          competency_name: metadata.competency_name || null,
+          competency: metadata.competency || null,
+          jours_disponibles: metadata.availability || metadata.jours_disponibles || metadata.days || {},
+          status: emp.status || 'accepted',
+          is_active: emp.is_active || false,
+          confirmed_at: emp.updated_at || emp.created_at,
+          created_at: emp.created_at,
+          ...emp
+        };
+      });
+      
+      console.log('[AdminConfirmedEmployeesCrud] Loaded confirmed employees:', transformed.length);
+      setItems(transformed);
     } catch (e) {
-      setError('Impossible de charger les employés validés');
+      console.error('[AdminConfirmedEmployeesCrud] Exception loading:', e);
+      setError(e.message || 'Impossible de charger les employés validés');
     } finally {
       setLoading(false);
     }
@@ -35,13 +81,31 @@ export default function AdminConfirmedEmployeesCrud({ token, onAuthError }) {
 
   const loadCompetencies = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/competencies`, { headers: { 'Accept': 'application/json' } });
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.data || []);
+      console.log('[AdminConfirmedEmployeesCrud] Loading competencies from Supabase...');
+      
+      const { data: competenciesData, error } = await supabase
+        .from('competencies')
+        .select('*');
+      
+      if (error) {
+        console.warn('[AdminConfirmedEmployeesCrud] Competencies table not found or error:', error);
+        setCompetencies({});
+        return;
+      }
+      
       const map = {};
-      list.forEach(c => { if (c?.id) map[c.id] = c.name || `#${c.id}`; });
+      if (Array.isArray(competenciesData)) {
+        competenciesData.forEach(c => { 
+          if (c?.id) map[c.id] = c.name || c.name_fr || c.name_ar || c.name_en || `#${c.id}`; 
+        });
+      }
+      
+      console.log('[AdminConfirmedEmployeesCrud] Loaded competencies:', Object.keys(map).length);
       setCompetencies(map);
-    } catch {}
+    } catch (e) {
+      console.warn('[AdminConfirmedEmployeesCrud] Exception loading competencies:', e);
+      setCompetencies({});
+    }
   };
 
   useEffect(() => { load(); loadCompetencies(); }, []);
@@ -255,29 +319,34 @@ export default function AdminConfirmedEmployeesCrud({ token, onAuthError }) {
 
   // Fonction pour obtenir l'URL de la photo de l'employé
   const getEmployeePhotoUrl = (employee) => {
-    if (!employee.photo) return '';
+    if (!employee.photo && !employee.photo_url) return '';
     
-    const rawP = String(employee.photo || '');
+    const photoPath = employee.photo_url || employee.photo;
+    const rawP = String(photoPath || '');
     const p = rawP.replace(/^"|"$/g,'').trim();
     
-    // Si c'est déjà une URL absolue
+    // Si c'est déjà une URL absolue (y compris Supabase Storage URLs)
     if (/^https?:\/\//i.test(p)) {
       return p;
     }
     
-    // Si c'est un chemin avec slash initial
-    if (p.startsWith('/')) {
-      return `${API_BASE_URL}${p}`;
+    // Si c'est un chemin Supabase Storage, construire l'URL publique
+    if (p.startsWith('employees/') || p.includes('employees/')) {
+      const { data } = supabase.storage.from('employees').getPublicUrl(p);
+      return data?.publicUrl || '';
     }
     
-    // Si c'est un chemin de stockage
-    if (p.includes('storage/') || p.includes('public/')) {
-      const cleanPath = p.replace(/^public\//,'').replace(/^\/?storage\//,'');
-      return `${API_BASE_URL}/storage/${cleanPath}`;
+    // Fallback: essayer de récupérer depuis Supabase Storage
+    try {
+      const { data } = supabase.storage.from('employees').getPublicUrl(p);
+      if (data?.publicUrl) {
+        return data.publicUrl;
+      }
+    } catch (e) {
+      // Ignorer les erreurs
     }
     
-    // Par défaut, essayer avec storage
-    return `${API_BASE_URL}/storage/${p}`;
+    return '';
   };
 
   // Fonction pour convertir une image en base64
@@ -357,30 +426,25 @@ export default function AdminConfirmedEmployeesCrud({ token, onAuthError }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/confirmed-employees/${employee.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.status === 401) {
-        onAuthError?.();
+      console.log('[AdminConfirmedEmployeesCrud] Deleting employee:', employee.id);
+      
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', employee.id);
+      
+      if (error) {
+        console.error('[AdminConfirmedEmployeesCrud] Error deleting employee:', error);
+        alert(`خطأ في حذف الموظف: ${error.message || 'خطأ غير معروف'}`);
         return;
       }
-
-      if (response.ok) {
-        alert(`تم حذف الموظف "${employee.name} ${employee.prenom}" بنجاح`);
-        // إعادة تحميل القائمة
-        await load();
-      } else {
-        const errorData = await response.json();
-        alert(`خطأ في حذف الموظف: ${errorData.message || 'خطأ غير معروف'}`);
-      }
+      
+      console.log('[AdminConfirmedEmployeesCrud] Employee deleted successfully');
+      alert(`تم حذف الموظف "${employee.name} ${employee.prenom}" بنجاح`);
+      // إعادة تحميل القائمة
+      await load();
     } catch (error) {
-      console.error('Erreur lors de la suppression:', error);
+      console.error('[AdminConfirmedEmployeesCrud] Exception deleting employee:', error);
       alert('خطأ في الاتصال بالخادم');
     }
   };
@@ -435,29 +499,25 @@ export default function AdminConfirmedEmployeesCrud({ token, onAuthError }) {
               <tr key={e.id}>
                 <td className="admin-td">{e.id}</td>
                 <td className="admin-td">
-                  {e.photo ? (() => {
-                    const rawP = String(e.photo || '');
-                    const p = rawP.replace(/^"|"$/g,'').trim();
-                    const isAbsolute = /^https?:\/\//i.test(p);
-                    const hasLeadingSlash = p.startsWith('/');
-                    const src = isAbsolute ? p : (hasLeadingSlash ? `${API_BASE_URL}${p}` : `${API_BASE_URL}/storage/${p.replace(/^public\//,'').replace(/^\/?storage\//,'')}`);
-                    return (
+                  {e.photo || e.photo_url ? (() => {
+                    const photoUrl = getEmployeePhotoUrl(e);
+                    return photoUrl ? (
                       <img
-                        src={src}
+                        src={photoUrl}
                         alt={e.name || 'photo'}
                         className="employee-avatar"
                         width={36}
                         height={36}
                         style={{objectFit:'cover',borderRadius:999}}
                         onError={(ev)=>{
-                          try {
-                            const raw = String(e.photo||'');
-                            const norm = raw.replace(/^"|"$/g,'').trim().replace(/^public\//,'').replace(/^\/?storage\//,'');
-                            ev.currentTarget.onerror = null;
-                            ev.currentTarget.src = `${API_BASE_URL}/storage/${norm}`;
-                          } catch {}
+                          ev.currentTarget.style.display = 'none';
+                          if (ev.currentTarget.nextElementSibling) {
+                            ev.currentTarget.nextElementSibling.style.display = 'flex';
+                          }
                         }}
                       />
+                    ) : (
+                      <div className="employee-avatar placeholder" aria-label="Sans photo">👤</div>
                     );
                   })() : (
                     <div className="employee-avatar placeholder" aria-label="Sans photo">👤</div>
