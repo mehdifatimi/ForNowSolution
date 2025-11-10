@@ -10,7 +10,7 @@ import TousLesServices from './TousLesServices';
 
 
 export default function Home() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   
   // Dynamic gallery data
   const [categories, setCategories] = useState([]);
@@ -85,7 +85,7 @@ export default function Home() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const locale = i18nInstance.language || 'fr';
+        const locale = i18n.language || 'fr';
         
         // Load categories from Supabase
         const { data: categoriesData, error: categoriesError } = await supabase
@@ -136,7 +136,7 @@ export default function Home() {
     };
     
     loadData();
-  }, [i18nInstance.language, getImageUrl]);
+  }, [i18n.language, getImageUrl]);
 
   // Load images for selected category
   useEffect(() => {
@@ -201,7 +201,7 @@ export default function Home() {
     };
     
     loadCategoryImages();
-  }, [selectedCategory, i18nInstance.language, getImageUrl]);
+  }, [selectedCategory, i18n.language, getImageUrl]);
 
   // Auto-slide functionality (for gallery slider section - currently commented)
   useEffect(() => {
