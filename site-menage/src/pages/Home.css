@@ -1025,12 +1025,24 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
 /* Responsive Design for Services */
 @media (max-width: 768px) {
   .home-services-grid { 
-    grid-template-columns: 1fr; 
+    grid-template-columns: 1fr !important; 
     gap: 16px; 
+    padding: 16px 0;
   }
   
   .home-service-card {
     min-height: 180px;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100%;
+  }
+  
+  .service-card-link {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100%;
   }
 
   .about-us {
@@ -1038,13 +1050,24 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
   }
 
   .about-highlights {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
     gap: 16px;
     margin-top: 24px;
   }
-
+  
   .about-card {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
     padding: 20px;
+  }
+  
+  .about-card h3 {
+    font-size: 1.1rem;
+  }
+  
+  .about-card p {
+    font-size: 0.9rem;
   }
 }
 

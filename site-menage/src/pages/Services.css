@@ -554,8 +554,16 @@
 @media (max-width: 768px) {
   .categories-grid,
   .types-grid-container {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
     gap: 16px;
+  }
+  
+  .category-card,
+  .type-card {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 150px;
   }
 
   .category-details-content {
@@ -564,11 +572,14 @@
 
   .actions-section {
     flex-direction: column;
+    gap: 12px;
   }
 
   .reserve-button,
   .back-services-button {
     width: 100%;
+    padding: 12px 20px;
+    font-size: 0.95rem;
   }
 
   .type-details-container {
@@ -580,7 +591,7 @@
   }
 
   .type-details-content {
-    padding: 24px;
+    padding: 24px 16px;
   }
 
   .type-image {
@@ -589,21 +600,59 @@
 
   .type-actions-section {
     flex-direction: column;
+    gap: 12px;
   }
 
   .type-reserve-button,
   .type-back-services-button {
     width: 100%;
     min-width: unset;
+    padding: 14px 20px;
+    font-size: 1rem;
   }
 
   .type-details-content .actions-section {
     flex-direction: column;
+    gap: 12px;
   }
 
   .type-details-content .reserve-button,
   .type-details-content .back-services-button {
     width: 100%;
+  }
+  
+  .category-card h3,
+  .type-card h4 {
+    font-size: 1.25rem;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .category-card,
+  .type-card {
+    min-height: 120px;
+  }
+  
+  .category-card h3,
+  .type-card h4 {
+    font-size: 1.1rem;
+  }
+  
+  .type-details-container {
+    padding: 20px 12px;
+  }
+  
+  .type-details-header h1 {
+    font-size: 1.75rem;
+  }
+  
+  .type-details-content {
+    padding: 20px 12px;
+  }
+  
+  .type-image {
+    height: 250px;
   }
 }
 
@@ -798,7 +847,7 @@
   }
   
   .services-header {
-    padding: 24px;
+    padding: 24px 16px;
     margin-bottom: 24px;
   }
 
@@ -817,23 +866,83 @@
   }
   
   .services-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
     gap: 16px;
+    padding: 16px 0;
   }
   
   .services-grid .home-service-card {
     min-height: 200px;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .service-card-link {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100%;
+  }
+  
+  .pcard,
+  .pcard-tilt {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100%;
+  }
+  
+  .card-tile {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-height: 120px;
+  }
+  
+  .grid-2-responsive {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
   }
   
   .services-stats {
     flex-direction: column;
     gap: 16px;
   }
+  
+  .services-display-section {
+    padding: 0 8px;
+  }
+  
+  .services-title-section h1 {
+    font-size: clamp(1.75rem, 5vw, 2.25rem);
+  }
+  
+  .services-title-section p {
+    font-size: 1rem;
+  }
+  
+  .cart-estimate {
+    padding: 16px;
+    margin: 16px auto;
+  }
+  
+  .service-card {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100%;
+    margin-bottom: 16px;
+  }
 }
 
 @media (max-width: 480px) {
+  .services-page {
+    padding: 16px 8px;
+  }
+  
   .services-header {
-    padding: 20px;
+    padding: 20px 12px;
   }
 
   .services-header h1 {
@@ -842,17 +951,56 @@
 
   .services-header .back-button {
     font-size: 14px;
-    top: 20px;
-    left: 20px;
+    padding: 8px 16px;
   }
   
   .mode-button {
     padding: 10px 12px;
     font-size: 13px;
+    min-width: auto;
   }
   
   .mode-icon {
     font-size: 14px;
+  }
+  
+  .services-grid {
+    gap: 12px;
+  }
+  
+  .services-grid .home-service-card {
+    min-height: 180px;
+    padding: 16px 12px;
+  }
+  
+  .card-tile {
+    padding: 16px 12px;
+    min-height: 100px;
+  }
+  
+  .card-title {
+    font-size: 1rem;
+  }
+  
+  .service-card {
+    padding: 16px 12px;
+  }
+  
+  .grid-2-responsive {
+    gap: 12px;
+  }
+  
+  .cart-estimate {
+    padding: 12px;
+    font-size: 0.9rem;
+  }
+  
+  .services-title-section h1 {
+    font-size: 1.5rem;
+  }
+  
+  .services-title-section p {
+    font-size: 0.9rem;
   }
 }
 

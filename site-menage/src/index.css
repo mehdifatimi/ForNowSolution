@@ -79,3 +79,73 @@ code {
 @media (max-width: 768px) {
   .container { padding: 0 12px; }
 }
+
+/* Global Mobile Responsive Fixes - Ensure cards and content are visible */
+@media (max-width: 768px) {
+  /* Ensure common card patterns are visible on mobile */
+  .product-card,
+  .service-card,
+  .home-service-card,
+  .category-card,
+  .type-card,
+  .about-card,
+  .gallery-item,
+  .info-card {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  /* Ensure common grid patterns stack on mobile */
+  .products-grid,
+  .services-grid,
+  .home-services-grid,
+  .categories-grid,
+  .types-grid-container,
+  .gallery-grid,
+  .about-highlights {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Ensure images are responsive */
+  .product-image,
+  .gallery-image,
+  .service-image {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+  }
+  
+  /* Prevent horizontal scroll */
+  body,
+  html,
+  #root,
+  .App {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+  
+  /* Ensure text is readable and doesn't overflow */
+  p, span, div, a, h1, h2, h3, h4, h5, h6 {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra small devices - ensure touch-friendly buttons */
+  button:not(.icon-button):not(.language-button),
+  .button:not(.icon-button),
+  .submit,
+  .filter-button,
+  .mode-button {
+    min-height: 40px;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  
+  /* Responsive typography */
+  h1 { font-size: clamp(1.5rem, 5vw, 2rem); }
+  h2 { font-size: clamp(1.25rem, 4vw, 1.75rem); }
+  h3 { font-size: clamp(1.1rem, 3vw, 1.5rem); }
+}
