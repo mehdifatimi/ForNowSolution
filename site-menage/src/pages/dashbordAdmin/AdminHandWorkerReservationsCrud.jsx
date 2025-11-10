@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AdminHandWorkerReservationsCrud.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminHandWorkerReservationsCrud({ token, onAuthError }) {
   const [reservations, setReservations] = useState([]);
@@ -39,65 +38,73 @@ export default function AdminHandWorkerReservationsCrud({ token, onAuthError }) 
   const loadData = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      // Load categories
-      const categoriesResponse = await fetch(`${API_BASE_URL}/api/admin/hand-worker-categories`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (categoriesResponse.status === 401) {
-        onAuthError();
-        return;
-      }
-
-      const categoriesData = await categoriesResponse.json();
-      if (categoriesData.success) {
-        setCategories(categoriesData.data);
-      }
-
-      // Load hand workers
-      const workersResponse = await fetch(`${API_BASE_URL}/api/admin/hand-workers`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (workersResponse.status === 401) {
-        onAuthError();
-        return;
-      }
-
-      const workersData = await workersResponse.json();
-      if (workersData.success) {
-        setHandWorkers(workersData.data);
-      }
-
-      // Load reservations
-      const reservationsResponse = await fetch(`${API_BASE_URL}/api/admin/hand-worker-reservations`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (reservationsResponse.status === 401) {
-        onAuthError();
-        return;
-      }
-
-      const reservationsData = await reservationsResponse.json();
-      if (reservationsData.success) {
-        setReservations(reservationsData.data);
+      console.log('[AdminHandWorkerReservations] Loading data from Supabase...');
+      
+      // Load categories from Supabase
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('hand_worker_categories')
+        .select('*')
+        .order('order', { ascending: true });
+      
+      if (categoriesError) {
+        console.error('[AdminHandWorkerReservations] Error loading categories:', categoriesError);
       } else {
-        setError('Erreur lors du chargement des réservations');
+        console.log('[AdminHandWorkerReservations] Loaded categories:', categoriesData?.length || 0);
+        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      }
+
+      // Load hand workers from Supabase
+      const { data: workersData, error: workersError } = await supabase
+        .from('hand_workers')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (workersError) {
+        console.error('[AdminHandWorkerReservations] Error loading workers:', workersError);
+      } else {
+        console.log('[AdminHandWorkerReservations] Loaded workers:', workersData?.length || 0);
+        setHandWorkers(Array.isArray(workersData) ? workersData : []);
+      }
+
+      // Load reservations from Supabase with related data
+      const { data: reservationsData, error: reservationsError } = await supabase
+        .from('hand_worker_reservations')
+        .select(`
+          *,
+          category:hand_worker_categories (
+            id,
+            name,
+            name_fr,
+            name_ar,
+            name_en
+          ),
+          hand_worker:hand_workers (
+            id,
+            first_name,
+            last_name
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (reservationsError) {
+        console.error('[AdminHandWorkerReservations] Error loading reservations:', reservationsError);
+        setError(`Erreur lors du chargement des réservations: ${reservationsError.message}`);
+      } else {
+        console.log('[AdminHandWorkerReservations] Loaded reservations:', reservationsData?.length || 0);
+        
+        // Transform data to include client_full_name
+        const transformedReservations = Array.isArray(reservationsData) ? reservationsData.map(res => ({
+          ...res,
+          client_full_name: `${res.client_first_name || ''} ${res.client_last_name || ''}`.trim()
+        })) : [];
+        
+        setReservations(transformedReservations);
       }
     } catch (e) {
-      console.error('Error loading data:', e);
-      setError('Erreur lors du chargement des données');
+      console.error('[AdminHandWorkerReservations] Exception loading data:', e);
+      setError(`Erreur: ${e.message || 'Erreur lors du chargement des données'}`);
     } finally {
       setLoading(false);
     }
@@ -107,37 +114,64 @@ export default function AdminHandWorkerReservationsCrud({ token, onAuthError }) 
     e.preventDefault();
     
     try {
-      const url = editingReservation 
-        ? `${API_BASE_URL}/api/admin/hand-worker-reservations/${editingReservation.id}`
-        : `${API_BASE_URL}/api/admin/hand-worker-reservations`;
+      setError('');
       
-      const method = editingReservation ? 'PUT' : 'POST';
+      console.log('[AdminHandWorkerReservations] Saving reservation:', { editing: !!editingReservation, formData });
       
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (response.status === 401) {
-        onAuthError();
-        return;
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        await loadData();
-        resetForm();
-        setShowForm(false);
+      // Prepare data for Supabase
+      const reservationData = {
+        client_first_name: formData.client_first_name,
+        client_last_name: formData.client_last_name,
+        client_email: formData.client_email,
+        client_phone: formData.client_phone,
+        category_id: formData.category_id || null,
+        hand_worker_id: formData.hand_worker_id || null,
+        service_description: formData.service_description,
+        preferred_date: formData.preferred_date || null,
+        preferred_time: formData.preferred_time || null,
+        duration_hours: formData.duration_hours ? parseFloat(formData.duration_hours) : null,
+        location: formData.location,
+        address: formData.address,
+        city: formData.city,
+        total_price: formData.total_price ? parseFloat(formData.total_price) : null,
+        status: formData.status || 'pending',
+        admin_notes: formData.admin_notes || null,
+        client_notes: formData.client_notes || null,
+        estimated_completion_date: formData.estimated_completion_date || null
+      };
+      
+      let result;
+      if (editingReservation) {
+        // Update existing
+        const { data, error } = await supabase
+          .from('hand_worker_reservations')
+          .update(reservationData)
+          .eq('id', editingReservation.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
       } else {
-        setError(data.message || 'Erreur lors de la sauvegarde');
+        // Insert new
+        const { data, error } = await supabase
+          .from('hand_worker_reservations')
+          .insert(reservationData)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
       }
+      
+      console.log('[AdminHandWorkerReservations] Save successful:', result);
+      
+      await loadData();
+      resetForm();
+      setShowForm(false);
     } catch (e) {
-      console.error('Error saving reservation:', e);
-      setError('Erreur lors de la sauvegarde');
+      console.error('[AdminHandWorkerReservations] Error saving reservation:', e);
+      setError(e.message || 'Erreur lors de la sauvegarde');
     }
   };
 
@@ -172,56 +206,47 @@ export default function AdminHandWorkerReservationsCrud({ token, onAuthError }) 
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/hand-worker-reservations/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.status === 401) {
-        onAuthError();
+      console.log('[AdminHandWorkerReservations] Deleting reservation:', id);
+      
+      const { error } = await supabase
+        .from('hand_worker_reservations')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[AdminHandWorkerReservations] Error deleting reservation:', error);
+        setError(`Erreur lors de la suppression: ${error.message}`);
         return;
       }
-
-      const data = await response.json();
-      if (data.success) {
-        await loadData();
-      } else {
-        setError(data.message || 'Erreur lors de la suppression');
-      }
+      
+      console.log('[AdminHandWorkerReservations] Delete successful');
+      await loadData();
     } catch (e) {
-      console.error('Error deleting reservation:', e);
-      setError('Erreur lors de la suppression');
+      console.error('[AdminHandWorkerReservations] Exception deleting reservation:', e);
+      setError(`Erreur: ${e.message}`);
     }
   };
 
   const handleStatusUpdate = async (id, newStatus) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/hand-worker-reservations/${id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (response.status === 401) {
-        onAuthError();
+      console.log('[AdminHandWorkerReservations] Updating status:', { id, newStatus });
+      
+      const { error } = await supabase
+        .from('hand_worker_reservations')
+        .update({ status: newStatus })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[AdminHandWorkerReservations] Error updating status:', error);
+        setError(`Erreur lors de la mise à jour du statut: ${error.message}`);
         return;
       }
-
-      const data = await response.json();
-      if (data.success) {
-        await loadData();
-      } else {
-        setError(data.message || 'Erreur lors de la mise à jour du statut');
-      }
+      
+      console.log('[AdminHandWorkerReservations] Status update successful');
+      await loadData();
     } catch (e) {
-      console.error('Error updating status:', e);
-      setError('Erreur lors de la mise à jour du statut');
+      console.error('[AdminHandWorkerReservations] Exception updating status:', e);
+      setError(`Erreur: ${e.message}`);
     }
   };
 
@@ -255,13 +280,15 @@ export default function AdminHandWorkerReservationsCrud({ token, onAuthError }) 
   };
 
   const getCategoryName = (categoryId) => {
+    if (!categoryId) return 'Non spécifiée';
     const category = categories.find(cat => cat.id === categoryId);
-    return category ? category.name : 'Catégorie inconnue';
+    return category ? (category.name || category.name_fr || category.name_ar || category.name_en || 'Catégorie inconnue') : 'Catégorie inconnue';
   };
 
   const getWorkerName = (workerId) => {
+    if (!workerId) return 'Non assigné';
     const worker = handWorkers.find(w => w.id === workerId);
-    return worker ? worker.full_name : 'Non assigné';
+    return worker ? `${worker.first_name || ''} ${worker.last_name || ''}`.trim() || 'Non assigné' : 'Non assigné';
   };
 
   const getStatusColor = (status) => {
@@ -545,8 +572,12 @@ export default function AdminHandWorkerReservationsCrud({ token, onAuthError }) 
               <div key={reservation.id} className="reservation-card">
                 <div className="reservation-header">
                   <div className="reservation-info">
-                    <h3>{reservation.client_full_name}</h3>
-                    <p className="reservation-category">{getCategoryName(reservation.category_id)}</p>
+                    <h3>{reservation.client_full_name || `${reservation.client_first_name} ${reservation.client_last_name}`.trim()}</h3>
+                    <p className="reservation-category">
+                      {reservation.category 
+                        ? (reservation.category.name || reservation.category.name_fr || reservation.category.name_ar || reservation.category.name_en || 'Catégorie inconnue')
+                        : getCategoryName(reservation.category_id)}
+                    </p>
                   </div>
                   <div className="reservation-actions">
                     <button 
@@ -576,11 +607,19 @@ export default function AdminHandWorkerReservationsCrud({ token, onAuthError }) 
                     </div>
                     <div className="detail-item">
                       <span className="label">Employé:</span>
-                      <span className="value">{getWorkerName(reservation.hand_worker_id)}</span>
+                      <span className="value">
+                        {reservation.hand_worker 
+                          ? `${reservation.hand_worker.first_name || ''} ${reservation.hand_worker.last_name || ''}`.trim() || 'Non assigné'
+                          : getWorkerName(reservation.hand_worker_id)}
+                      </span>
                     </div>
                     <div className="detail-item">
                       <span className="label">Date:</span>
-                      <span className="value">{new Date(reservation.preferred_date).toLocaleDateString('fr-FR')}</span>
+                      <span className="value">
+                        {reservation.preferred_date 
+                          ? new Date(reservation.preferred_date).toLocaleDateString('fr-FR')
+                          : '-'}
+                      </span>
                     </div>
                     <div className="detail-item">
                       <span className="label">Durée:</span>

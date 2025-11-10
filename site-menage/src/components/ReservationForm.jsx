@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './ReservationForm.css';
+import { supabase } from '../lib/supabase';
 
 const ReservationForm = ({ serviceId, serviceType, onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -75,42 +76,48 @@ const ReservationForm = ({ serviceId, serviceType, onSuccess, onCancel }) => {
     }
     
     setIsSubmitting(true);
+    setErrors({});
     
     try {
-      const endpoint = serviceType === 'bebe' 
-        ? '/api/bebe/reservation' 
-        : '/api/jardinage/reservation';
+      // Get user ID from Supabase session if available
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || null;
       
-      const payload = {
-        ...formData,
-        hours: parseInt(formData.hours)
-      };
+      // Calculate total price
+      const totalPrice = calculatePrice(parseInt(formData.hours));
       
-      // Add service ID field based on service type
       if (serviceType === 'jardinage') {
-        payload.jardinage_service_id = serviceId;
-      }
-      
-      console.log('Submitting payload:', payload);
-      console.log('Endpoint:', endpoint);
-      
-      const response = await fetch(`http://localhost:8000${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-      
-      const data = await response.json();
-      console.log('Response data:', data);
-      
-      if (response.ok) {
-        onSuccess(data);
+        // Insert jardinage reservation into Supabase
+        const reservationData = {
+          user_id: userId,
+          jardinage_service_id: serviceId || null,
+          client_name: formData.client_name.trim(),
+          client_phone: formData.client_phone.trim(),
+          client_email: null, // Can be added later if needed
+          reservation_date: formData.reservation_date,
+          hours: parseInt(formData.hours),
+          total_price: totalPrice,
+          status: 'pending',
+          notes: formData.notes.trim() || null
+        };
+        
+        console.log('[ReservationForm] Submitting jardinage reservation:', reservationData);
+        
+        const { data, error } = await supabase
+          .from('jardinage_reservations')
+          .insert(reservationData)
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('[ReservationForm] Error submitting reservation:', error);
+          setErrors({ general: error.message || 'Erreur lors de la création de la réservation' });
+          return;
+        }
+        
+        console.log('[ReservationForm] Reservation submitted successfully:', data);
+        onSuccess({ success: true, data });
+        
         // Reset form
         setFormData({
           client_name: '',
@@ -119,16 +126,16 @@ const ReservationForm = ({ serviceId, serviceType, onSuccess, onCancel }) => {
           hours: 1,
           notes: ''
         });
+      } else if (serviceType === 'bebe') {
+        // For bebe reservations, we might need a separate table or use a general reservations table
+        // For now, we'll show an error message
+        setErrors({ general: 'Les réservations pour les services bébé ne sont pas encore disponibles via Supabase. Veuillez contacter l\'administrateur.' });
       } else {
-        console.error('Server error:', data);
-        if (data.errors) {
-          setErrors(data.errors);
-        } else {
-          setErrors({ general: data.message || 'Erreur lors de la création de la réservation' });
-        }
+        setErrors({ general: 'Type de service non reconnu' });
       }
     } catch (error) {
-      setErrors({ general: 'Erreur de connexion. Veuillez réessayer.' });
+      console.error('[ReservationForm] Exception submitting reservation:', error);
+      setErrors({ general: error.message || 'Erreur de connexion. Veuillez réessayer.' });
     } finally {
       setIsSubmitting(false);
     }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AdminHandWorkerRegistrationsCrud.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminValideHandWorkerReservationsCrud({ token, onAuthError }) {
   const [registrations, setRegistrations] = useState([]);
@@ -19,47 +18,75 @@ export default function AdminValideHandWorkerReservationsCrud({ token, onAuthErr
   const loadData = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      // Load categories
-      const categoriesResponse = await fetch(`${API_BASE_URL}/hand-worker-categories`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (categoriesResponse.status === 401) {
-        onAuthError();
-        return;
-      }
-
-      const categoriesData = await categoriesResponse.json();
-      if (categoriesData.success) {
-        setCategories(categoriesData.data);
-      }
-
-      // Load validated registrations
-      const registrationsResponse = await fetch(`${API_BASE_URL}/admin/valide-hand-worker-reservations`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (registrationsResponse.status === 401) {
-        onAuthError();
-        return;
-      }
-
-      const registrationsData = await registrationsResponse.json();
-      if (registrationsData.success) {
-        setRegistrations(registrationsData.data);
+      console.log('[AdminValideHandWorkerReservations] Loading data from Supabase...');
+      
+      // Load categories from Supabase
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('hand_worker_categories')
+        .select('*')
+        .order('order', { ascending: true });
+      
+      if (categoriesError) {
+        console.error('[AdminValideHandWorkerReservations] Error loading categories:', categoriesError);
       } else {
-        setError('Erreur lors du chargement des travailleurs validés');
+        console.log('[AdminValideHandWorkerReservations] Loaded categories:', categoriesData?.length || 0);
+        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      }
+
+      // Load validated hand workers
+      // Load all workers first, then filter in JavaScript for validated ones
+      const { data: allWorkersData, error: workersError } = await supabase
+        .from('hand_workers')
+        .select(`
+          *,
+          category:hand_worker_categories (
+            id,
+            name,
+            name_fr,
+            name_ar,
+            name_en
+          )
+        `)
+        .order('updated_at', { ascending: false });
+      
+      // Filter validated workers: status = 'approved' OR (is_available = true AND status != 'pending')
+      const workersData = Array.isArray(allWorkersData) ? allWorkersData.filter(worker => {
+        return worker.status === 'approved' || (worker.is_available === true && worker.status !== 'pending');
+      }) : [];
+      
+      if (workersError) {
+        console.error('[AdminValideHandWorkerReservations] Error loading workers:', workersError);
+        setError(`Erreur lors du chargement: ${workersError.message}`);
+      } else {
+        console.log('[AdminValideHandWorkerReservations] Loaded validated workers:', workersData?.length || 0);
+        
+        // Transform data to match expected format
+        const transformedData = Array.isArray(workersData) ? workersData.map(worker => ({
+          id: worker.id,
+          full_name: `${worker.first_name || ''} ${worker.last_name || ''}`.trim() || 'N/A',
+          email: worker.email || 'N/A',
+          phone: worker.phone || 'N/A',
+          category_id: worker.category_id,
+          category_name: worker.category 
+            ? (worker.category.name || worker.category.name_fr || worker.category.name_ar || worker.category.name_en || 'N/A')
+            : 'N/A',
+          address: worker.address || '',
+          city: worker.city || '',
+          experience_years: worker.experience_years || 0,
+          photo: worker.photo || null,
+          photo_url: worker.photo || null,
+          status: worker.status === 'approved' ? 'approved' : 'active',
+          approved_at: worker.updated_at || worker.created_at,
+          ...worker
+        })) : [];
+        
+        setRegistrations(transformedData);
       }
     } catch (e) {
-      console.error('Error loading data:', e);
-      setError('Erreur lors du chargement des données');
+      console.error('[AdminValideHandWorkerReservations] Exception loading data:', e);
+      setError(`Erreur: ${e.message || 'Erreur lors du chargement des données'}`);
     } finally {
       setLoading(false);
     }
@@ -71,35 +98,33 @@ export default function AdminValideHandWorkerReservationsCrud({ token, onAuthErr
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/valide-hand-worker-reservations/${registrationId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.status === 401) {
-        onAuthError();
+      console.log('[AdminValideHandWorkerReservations] Deleting worker:', registrationId);
+      
+      const { error } = await supabase
+        .from('hand_workers')
+        .delete()
+        .eq('id', registrationId);
+      
+      if (error) {
+        console.error('[AdminValideHandWorkerReservations] Error deleting worker:', error);
+        setError(`Erreur lors de la suppression: ${error.message}`);
         return;
       }
-
-      const data = await response.json();
-      if (data.success) {
-        setSuccess('Travailleur validé supprimé avec succès');
-        await loadData();
-      } else {
-        setError(data.message || 'Erreur lors de la suppression');
-      }
+      
+      console.log('[AdminValideHandWorkerReservations] Delete successful');
+      setSuccess('Travailleur validé supprimé avec succès');
+      setTimeout(() => setSuccess(''), 3000);
+      await loadData();
     } catch (e) {
-      console.error('Error deleting validated worker:', e);
-      setError('Erreur lors de la suppression');
+      console.error('[AdminValideHandWorkerReservations] Exception deleting worker:', e);
+      setError(`Erreur: ${e.message}`);
     }
   };
 
   const getCategoryName = (categoryId) => {
+    if (!categoryId) return 'N/A';
     const category = categories.find(cat => cat.id === categoryId);
-    return category ? category.name : 'N/A';
+    return category ? (category.name || category.name_fr || category.name_ar || category.name_en || 'N/A') : 'N/A';
   };
 
   const filteredRegistrations = registrations.filter(registration => {
@@ -200,9 +225,9 @@ export default function AdminValideHandWorkerReservationsCrud({ token, onAuthErr
               filteredRegistrations.map(registration => (
                 <tr key={registration.id}>
                   <td className="photo-cell">
-                    {registration.photo ? (
+                    {registration.photo || registration.photo_url ? (
                       <img 
-                        src={`http://localhost:8000/storage/${registration.photo}`} 
+                        src={registration.photo_url || registration.photo} 
                         alt={registration.full_name}
                         className="registration-photo"
                         onError={(e) => {
@@ -219,7 +244,7 @@ export default function AdminValideHandWorkerReservationsCrud({ token, onAuthErr
                   <td className="email-cell">{registration.email}</td>
                   <td className="phone-cell">{registration.phone}</td>
                   <td className="category-cell">
-                    {getCategoryName(registration.category_id)}
+                    {registration.category_name || getCategoryName(registration.category_id)}
                   </td>
                   <td>
                     {registration.address && `${registration.address}, `}

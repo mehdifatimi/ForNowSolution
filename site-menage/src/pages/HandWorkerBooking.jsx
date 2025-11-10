@@ -3,9 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { translateHandWorkerCategories } from '../services/handWorkerTranslation';
 import i18n from '../i18n';
+import { supabase } from '../lib/supabase';
 import './HandWorkerBooking.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 export default function HandWorkerBooking() {
   const { t } = useTranslation();
@@ -67,29 +66,40 @@ export default function HandWorkerBooking() {
   const loadCategories = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/hand-worker-categories`);
-      const data = await response.json();
+      setError('');
       
-      if (data.success) {
-        // Appliquer les traductions selon la langue actuelle
-        const currentLanguage = i18n.language || 'fr';
-        const translatedCategories = translateHandWorkerCategories(data.data, currentLanguage);
-        setCategories(translatedCategories);
-        
-        // Auto-select category if provided in URL
-        const categoryId = searchParams.get('category');
-        if (categoryId) {
-          const category = translatedCategories.find(cat => cat.id == categoryId);
-          if (category) {
-            setSelectedCategory(category);
-            loadHandWorkers(categoryId);
-          }
-        }
-      } else {
+      console.log('[HandWorkerBooking] Loading categories from Supabase...');
+      
+      const { data, error } = await supabase
+        .from('hand_worker_categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('order', { ascending: true });
+      
+      if (error) {
+        console.error('[HandWorkerBooking] Error loading categories:', error);
         setError(t('hand_worker_booking.loading_error'));
+        return;
+      }
+      
+      console.log('[HandWorkerBooking] Loaded categories:', data?.length || 0);
+      
+      // Appliquer les traductions selon la langue actuelle
+      const currentLanguage = i18n.language || 'fr';
+      const translatedCategories = translateHandWorkerCategories(data || [], currentLanguage);
+      setCategories(translatedCategories);
+      
+      // Auto-select category if provided in URL
+      const categoryId = searchParams.get('category');
+      if (categoryId) {
+        const category = translatedCategories.find(cat => cat.id == categoryId);
+        if (category) {
+          setSelectedCategory(category);
+          loadHandWorkers(categoryId);
+        }
       }
     } catch (e) {
-      console.error('Error loading categories:', e);
+      console.error('[HandWorkerBooking] Exception loading categories:', e);
       setError(t('hand_worker_booking.loading_error'));
     } finally {
       setLoading(false);
@@ -98,14 +108,24 @@ export default function HandWorkerBooking() {
 
   const loadHandWorkers = async (categoryId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/hand-workers/category/${categoryId}`);
-      const data = await response.json();
+      console.log('[HandWorkerBooking] Loading hand workers for category:', categoryId);
       
-      if (data.success) {
-        setHandWorkers(data.data);
+      const { data, error } = await supabase
+        .from('hand_workers')
+        .select('*')
+        .eq('category_id', categoryId)
+        .eq('is_available', true)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[HandWorkerBooking] Error loading hand workers:', error);
+        return;
       }
+      
+      console.log('[HandWorkerBooking] Loaded hand workers:', data?.length || 0);
+      setHandWorkers(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.error('Error loading hand workers:', e);
+      console.error('[HandWorkerBooking] Exception loading hand workers:', e);
     }
   };
 
@@ -145,43 +165,73 @@ export default function HandWorkerBooking() {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/hand-worker-reservations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSuccess(true);
-        // Reset form
-        setFormData({
-          client_first_name: '',
-          client_last_name: '',
-          client_email: '',
-          client_phone: '',
-          category_id: '',
-          hand_worker_id: '',
-          service_description: '',
-          preferred_date: '',
-          preferred_time: '',
-          duration_hours: 1,
-          location: '',
-          address: '',
-          city: '',
-          client_notes: ''
-        });
-        setSelectedCategory(null);
-        setHandWorkers([]);
-      } else {
-        setError(data.message || t('hand_worker_booking.submission_error'));
+      console.log('[HandWorkerBooking] Submitting reservation:', formData);
+      
+      // Get user ID from Supabase session if available
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || null;
+      
+      // Calculate total price
+      const totalPrice = calculateTotalPrice();
+      
+      // Prepare reservation data
+      const reservationData = {
+        user_id: userId,
+        client_first_name: formData.client_first_name,
+        client_last_name: formData.client_last_name,
+        client_email: formData.client_email,
+        client_phone: formData.client_phone,
+        category_id: formData.category_id || null,
+        hand_worker_id: formData.hand_worker_id || null,
+        service_description: formData.service_description,
+        preferred_date: formData.preferred_date || null,
+        preferred_time: formData.preferred_time || null,
+        duration_hours: formData.duration_hours ? parseFloat(formData.duration_hours) : null,
+        location: formData.location,
+        address: formData.address,
+        city: formData.city,
+        total_price: totalPrice || null,
+        status: 'pending',
+        client_notes: formData.client_notes || null
+      };
+      
+      const { data, error } = await supabase
+        .from('hand_worker_reservations')
+        .insert(reservationData)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('[HandWorkerBooking] Error submitting reservation:', error);
+        setError(error.message || t('hand_worker_booking.submission_error'));
+        return;
       }
+      
+      console.log('[HandWorkerBooking] Reservation submitted successfully:', data);
+      
+      setSuccess(true);
+      // Reset form
+      setFormData({
+        client_first_name: '',
+        client_last_name: '',
+        client_email: '',
+        client_phone: '',
+        category_id: '',
+        hand_worker_id: '',
+        service_description: '',
+        preferred_date: '',
+        preferred_time: '',
+        duration_hours: 1,
+        location: '',
+        address: '',
+        city: '',
+        client_notes: ''
+      });
+      setSelectedCategory(null);
+      setHandWorkers([]);
     } catch (e) {
-      console.error('Error submitting reservation:', e);
-      setError(t('hand_worker_booking.submission_error'));
+      console.error('[HandWorkerBooking] Exception submitting reservation:', e);
+      setError(e.message || t('hand_worker_booking.submission_error'));
     } finally {
       setSubmitting(false);
     }

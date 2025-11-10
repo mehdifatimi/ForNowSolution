@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './AdminCrud.css';
 import LanguageFields from '../../components/LanguageFields';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminSecurityRolesCrud({ token, onAuthError }) {
   const [roles, setRoles] = useState([]);
@@ -14,13 +13,30 @@ export default function AdminSecurityRolesCrud({ token, onAuthError }) {
 
   const load = async () => {
     try {
-      setLoading(true); setError('');
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-roles`, { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` } });
-      const data = await res.json();
-      setRoles(Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []));
+      setLoading(true); 
+      setError('');
+      
+      console.log('[AdminSecurityRoles] Loading security roles from Supabase...');
+      
+      const { data, error } = await supabase
+        .from('security_roles')
+        .select('*')
+        .order('order', { ascending: true });
+      
+      if (error) {
+        console.error('[AdminSecurityRoles] Error loading roles:', error);
+        setError(`Erreur lors du chargement: ${error.message}`);
+        return;
+      }
+      
+      console.log('[AdminSecurityRoles] Loaded roles:', data?.length || 0);
+      setRoles(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError('Impossible de charger les rôles');
-    } finally { setLoading(false); }
+      console.error('[AdminSecurityRoles] Exception loading roles:', e);
+      setError(`Erreur: ${e.message || 'Impossible de charger les rôles'}`);
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -51,42 +67,79 @@ export default function AdminSecurityRolesCrud({ token, onAuthError }) {
     e.preventDefault();
     try {
       setError('');
-      const url = editing ? `${API_BASE_URL}/api/admin/security-roles/${editing.id}` : `${API_BASE_URL}/api/admin/security-roles`;
-      const method = editing ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(form)
-      });
-      if (res.status === 401) { onAuthError?.(); return; }
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || 'Erreur lors de la sauvegarde');
+      
+      console.log('[AdminSecurityRoles] Saving role:', { editing: !!editing, form });
+      
+      const roleData = {
+        name: form.name || null,
+        name_ar: form.name_ar || null,
+        name_fr: form.name_fr || null,
+        name_en: form.name_en || null,
+        description: form.description || null,
+        description_ar: form.description_ar || null,
+        description_fr: form.description_fr || null,
+        description_en: form.description_en || null,
+        is_active: form.is_active,
+        order: editing?.order || 0
+      };
+      
+      let result;
+      if (editing) {
+        // Update existing
+        const { data, error } = await supabase
+          .from('security_roles')
+          .update(roleData)
+          .eq('id', editing.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      } else {
+        // Insert new
+        const { data, error } = await supabase
+          .from('security_roles')
+          .insert(roleData)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
       }
+      
+      console.log('[AdminSecurityRoles] Save successful:', result);
+      
       await load();
       setShowForm(false);
       setEditing(null);
     } catch (e2) {
-      setError(e2.message || 'Erreur réseau');
+      console.error('[AdminSecurityRoles] Error saving role:', e2);
+      setError(e2.message || 'Erreur lors de la sauvegarde');
     }
   };
 
   const removeItem = async (role) => {
     if (!window.confirm('Supprimer ce rôle ?')) return;
+    
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-roles/${role.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
-      if (res.status === 401) { onAuthError?.(); return; }
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || 'Erreur lors de la suppression');
+      console.log('[AdminSecurityRoles] Deleting role:', role.id);
+      
+      const { error } = await supabase
+        .from('security_roles')
+        .delete()
+        .eq('id', role.id);
+      
+      if (error) {
+        console.error('[AdminSecurityRoles] Delete error:', error);
+        setError(`Erreur lors de la suppression: ${error.message}`);
+        return;
       }
+      
+      console.log('[AdminSecurityRoles] Delete successful');
       await load();
     } catch (e) {
-      setError(e.message || 'Erreur réseau');
+      console.error('[AdminSecurityRoles] Exception during delete:', e);
+      setError(`Erreur: ${e.message}`);
     }
   };
 
@@ -117,8 +170,8 @@ export default function AdminSecurityRolesCrud({ token, onAuthError }) {
             {roles.map(r => (
               <tr key={r.id}>
                 <td className="admin-td">{r.id}</td>
-                <td className="admin-td">{r.name}</td>
-                <td className="admin-td">{r.description || '-'}</td>
+                <td className="admin-td">{r.name || r.name_fr || r.name_ar || r.name_en || '-'}</td>
+                <td className="admin-td">{r.description || r.description_fr || r.description_ar || r.description_en || '-'}</td>
                 <td className="admin-td">{r.is_active ? 'Actif' : 'Inactif'}</td>
                 <td className="admin-td">
                   <div style={{display:'flex',gap:8}}>

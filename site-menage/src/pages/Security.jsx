@@ -354,39 +354,45 @@ export default function Security() {
       const userInfo = JSON.parse(localStorage.getItem('user') || '{}');
       console.log('🔍 User info:', userInfo);
       
-      if (!userInfo?.id) {
-        setToast({ show: true, text: t('security_page.please_login') });
-        setTimeout(() => setToast({ show: false, text: '' }), 3000);
-        setReservationLoading(false);
-        return;
-      }
-
-      // Get user ID from Supabase session
+      // Get user ID from Supabase session (must be UUID, not numeric ID)
+      // user_id in reserve_security is UUID type (references auth.users)
       const { data: { session } } = await supabase.auth.getSession();
-      const userId = session?.user?.id || userInfo.id;
+      const userId = session?.user?.id || null; // Must be UUID from Supabase Auth
       
-      if (!userId) {
-        setToast({ show: true, text: t('security_page.please_login') });
-        setTimeout(() => setToast({ show: false, text: '' }), 3000);
-        setReservationLoading(false);
-        return;
-      }
+      // Note: user_id can be null if user is not logged in via Supabase Auth
+      // The reservation will still be saved with firstname, email, phone for identification
+      // The table allows user_id to be NULL (ON DELETE SET NULL)
 
       // Calculate total price
       const totalPrice = calculateReservationPrice(reservationForm);
       
+      // Prepare location - must not be empty (NOT NULL constraint)
+      const location = userInfo.location || reservationForm.location || 'Non spécifié';
+      
+      // Prepare date_reservation
+      const dateReservation = reservationForm.date_reservation ? new Date(reservationForm.date_reservation).toISOString().split('T')[0] : null;
+      
+      // Prepare preferred_date (TIMESTAMPTZ)
+      const preferredDate = reservationForm.date_reservation ? new Date(reservationForm.date_reservation).toISOString() : null;
+      
       const insertData = {
-        user_id: userId,
+        user_id: userId || null,
         security_id: null, // Will be assigned later by admin
         firstname: userInfo.firstname || userInfo.name || 'User',
         phone: reservationForm.phone.trim(),
-        location: userInfo.location || '',
-        email: userInfo.email || '',
+        location: location, // Required field, must not be empty
+        email: userInfo.email || null,
         message: `Reservation for role_id: ${reservationForm.role_id}, Type: ${reservationForm.type_reservation}`,
-        total_price: totalPrice,
+        total_price: totalPrice || 0,
         status: 'pending',
-        preferred_date: reservationForm.date_reservation ? new Date(reservationForm.date_reservation).toISOString() : null,
-        admin_notes: `Type: ${reservationForm.type_reservation}, Start: ${reservationForm.heure_debut || 'N/A'}, End: ${reservationForm.heure_fin || 'N/A'}`
+        preferred_date: preferredDate,
+        admin_notes: `Type: ${reservationForm.type_reservation}, Start: ${reservationForm.heure_debut || 'N/A'}, End: ${reservationForm.heure_fin || 'N/A'}`,
+        // Add new columns if they exist
+        type_reservation: reservationForm.type_reservation || 'jour',
+        date_reservation: dateReservation,
+        heure_debut: reservationForm.type_reservation === 'heure' && reservationForm.heure_debut ? reservationForm.heure_debut : null,
+        heure_fin: reservationForm.type_reservation === 'heure' && reservationForm.heure_fin ? reservationForm.heure_fin : null,
+        role_id: reservationForm.role_id || null
       };
       
       console.log('[Security] Submitting reservation:', insertData);

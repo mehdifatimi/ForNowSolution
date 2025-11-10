@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './AdminSecurityReservationsCrud.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminSecurityReservationsCrud({ token, onAuthError }) {
   const [reservations, setReservations] = useState([]);
@@ -18,37 +17,91 @@ export default function AdminSecurityReservationsCrud({ token, onAuthError }) {
     try {
       setError('');
       setLoading(true);
-      console.log('🔑 Admin token:', token ? 'Present' : 'Missing');
+      console.log('[AdminSecurityReservations] Loading security reservations from Supabase...');
       
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-reservations`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      console.log('📡 Response status:', res.status);
-      console.log('📡 Response headers:', res.headers);
-
-      if (res.status === 401) {
-        onAuthError?.();
+      // Load reservations with related data (security)
+      // Note: user data is stored in the reservation itself (firstname, email)
+      // We'll load roles separately and match them
+      const { data, error } = await supabase
+        .from('reserve_security')
+        .select(`
+          *,
+          security:securities (
+            id,
+            full_name,
+            name,
+            role_id
+          )
+        `)
+        .order('created_at', { ascending: false});
+      
+      if (error) {
+        console.error('[AdminSecurityReservations] Error loading reservations:', error);
+        setError(`Erreur lors du chargement: ${error.message}`);
         return;
       }
-
-      if (res.ok) {
-        const data = await res.json();
-        console.log('📊 Data received:', data);
-        setReservations(Array.isArray(data) ? data : []);
-      } else {
-        const errorText = await res.text();
-        console.error('❌ Error response:', errorText);
-        setError('Erreur lors du chargement des réservations');
+      
+      // Load security roles separately
+      let roles = [];
+      if (data && data.length > 0) {
+        const { data: rolesData } = await supabase
+          .from('security_roles')
+          .select('*');
+        roles = rolesData || [];
       }
+      
+      console.log('[AdminSecurityReservations] Loaded reservations:', data?.length || 0);
+      
+      // Transform data to match expected format
+      const transformedData = Array.isArray(data) ? data.map(res => {
+        // Extract type_reservation, heure_debut, heure_fin from admin_notes if not in columns
+        let typeReservation = res.type_reservation || 'jour';
+        let heureDebut = res.heure_debut || '';
+        let heureFin = res.heure_fin || '';
+        
+        // If not in columns, try to extract from admin_notes
+        if (!res.type_reservation && res.admin_notes) {
+          const notes = res.admin_notes;
+          if (notes.includes('Type: jour')) typeReservation = 'jour';
+          else if (notes.includes('Type: heure')) typeReservation = 'heure';
+          
+          const startMatch = notes.match(/Start:\s*([0-9]{2}:[0-9]{2})/);
+          const endMatch = notes.match(/End:\s*([0-9]{2}:[0-9]{2})/);
+          if (startMatch) heureDebut = startMatch[1];
+          if (endMatch) heureFin = endMatch[1];
+        }
+        
+        // Extract date_reservation from preferred_date if not in column
+        let dateReservation = res.date_reservation;
+        if (!dateReservation && res.preferred_date) {
+          dateReservation = new Date(res.preferred_date).toISOString().split('T')[0];
+        }
+        
+        // Find role for this security
+        const securityRoleId = res.security?.role_id;
+        const securityRole = securityRoleId ? roles.find(r => r.id === securityRoleId) : null;
+        
+        return {
+          id: res.id,
+          user_name: res.firstname || 'N/A',
+          user_email: res.email || 'N/A',
+          security_name: res.security?.full_name || res.security?.name || 'Non assigné',
+          security_role: securityRole ? (securityRole.name || securityRole.name_fr || securityRole.name_ar || 'N/A') : 'N/A',
+          type_reservation: typeReservation,
+          date_reservation: dateReservation || '',
+          heure_debut: heureDebut,
+          heure_fin: heureFin,
+          prix_total: res.total_price || 0,
+          status: res.status || 'pending',
+          created_at: res.created_at,
+          ...res
+        };
+      }) : [];
+      
+      setReservations(transformedData);
     } catch (e) {
-      console.error('❌ Network error:', e);
-      setError('Erreur de connexion');
+      console.error('[AdminSecurityReservations] Exception loading reservations:', e);
+      setError(`Erreur: ${e.message || 'Impossible de charger les réservations'}`);
     } finally {
       setLoading(false);
     }

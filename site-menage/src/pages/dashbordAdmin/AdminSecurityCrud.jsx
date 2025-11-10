@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './AdminCrud.css';
 import './AdminSecurityCrud.css';
 import LanguageFields from '../../components/LanguageFields';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminSecurityCrud({ token, onAuthError }) {
   const [items, setItems] = useState([]);
@@ -17,26 +16,58 @@ export default function AdminSecurityCrud({ token, onAuthError }) {
 
   const load = async () => {
     try {
-      setLoading(true); setError('');
-      const res = await fetch(`${API_BASE_URL}/api/admin/securities`, { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' } });
-      if (res.status === 401) { onAuthError?.(); return; }
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.data?.data || data.data || []);
-      setItems(list);
+      setLoading(true); 
+      setError('');
+      
+      console.log('[AdminSecurityCrud] Loading securities from Supabase...');
+      
+      // Load securities from Supabase
+      // Note: If role_id column exists, we can join with security_roles
+      // Otherwise, we'll load roles separately and match them
+      const { data, error } = await supabase
+        .from('securities')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[AdminSecurityCrud] Error loading securities:', error);
+        setError(`Erreur lors du chargement: ${error.message}`);
+        return;
+      }
+      
+      console.log('[AdminSecurityCrud] Loaded securities:', data?.length || 0);
+      
+      // Map roles to securities if role_id exists
+      // Note: roles might not be loaded yet, so we'll map them in a separate effect
+      setItems(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError('Impossible de charger la sécurité');
-    } finally { setLoading(false); }
+      console.error('[AdminSecurityCrud] Exception loading securities:', e);
+      setError(`Erreur: ${e.message || 'Impossible de charger les agents de sécurité'}`);
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const loadRoles = async () => {
     try {
       setRolesLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/security-roles`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      console.log('[AdminSecurityCrud] Loading security roles from Supabase...');
+      
+      const { data, error } = await supabase
+        .from('security_roles')
+        .select('*')
+        .order('order', { ascending: true });
+      
+      if (error) {
+        console.error('[AdminSecurityCrud] Error loading roles:', error);
+        setRoles([]);
+        return;
+      }
+      
+      console.log('[AdminSecurityCrud] Loaded roles:', data?.length || 0);
       setRoles(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.error('Erreur lors du chargement des rôles:', e);
+      console.error('[AdminSecurityCrud] Exception loading roles:', e);
       setRoles([]);
     } finally {
       setRolesLoading(false);
@@ -44,20 +75,21 @@ export default function AdminSecurityCrud({ token, onAuthError }) {
   };
 
   useEffect(() => { 
-    load(); 
+    // Load roles and securities
     loadRoles();
-  }, []);
+    load();
+  }, [token]); // Recharger si le token change
 
   const openCreate = () => { setEditing(null); setForm({ name:'', name_ar:'', name_fr:'', name_en:'', role_id:'', experience_years:0, description:'', description_ar:'', description_fr:'', description_en:'', is_active:true, photo:null }); setShowForm(true); };
   const openEdit = (item) => { 
-    console.log('Édition de l\'item:', item);
+    console.log('[AdminSecurityCrud] Édition de l\'item:', item);
     setEditing(item); 
     setForm({ 
-      name: item.name || '', 
+      name: item.name || item.full_name || '', 
       name_ar: item.name_ar || '',
       name_fr: item.name_fr || '',
       name_en: item.name_en || '',
-      role_id: item.role_id || '', 
+      role_id: item.role_id || (item.role?.id ? item.role.id : ''), 
       experience_years: item.experience_years || 0, 
       description: item.description || '', 
       description_ar: item.description_ar || '',
@@ -66,9 +98,9 @@ export default function AdminSecurityCrud({ token, onAuthError }) {
       is_active: !!item.is_active, 
       photo: null 
     }); 
-    console.log('Formulaire pré-rempli:', { 
-      name: item.name || '', 
-      role_id: item.role_id || '', 
+    console.log('[AdminSecurityCrud] Formulaire pré-rempli:', { 
+      name: item.name || item.full_name || '', 
+      role_id: item.role_id || (item.role?.id ? item.role.id : ''), 
       experience_years: item.experience_years || 0, 
       description: item.description || '', 
       is_active: !!item.is_active 
@@ -76,62 +108,134 @@ export default function AdminSecurityCrud({ token, onAuthError }) {
     setShowForm(true); 
   };
 
+  // Upload image to Supabase Storage
+  const uploadImage = async (file) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `security_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = fileName;
+      
+      console.log('[AdminSecurityCrud] Uploading image to Supabase Storage:', fileName);
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('employees')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (uploadError) {
+        console.error('[AdminSecurityCrud] Upload error:', uploadError);
+        if (uploadError.message?.includes('Bucket not found')) {
+          throw new Error('Bucket "employees" غير موجود. يرجى إنشاء bucket "employees" في Supabase Storage أولاً.');
+        }
+        throw new Error(uploadError.message || 'Erreur lors du téléchargement de l\'image');
+      }
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('employees')
+        .getPublicUrl(filePath);
+      
+      console.log('[AdminSecurityCrud] Image uploaded successfully:', publicUrl);
+      return publicUrl;
+    } catch (err) {
+      console.error('[AdminSecurityCrud] Error uploading image:', err);
+      throw err;
+    }
+  };
+
   const save = async (e) => {
     e.preventDefault();
     try {
-      const fd = new FormData();
-      fd.append('name', form.name);
-      if (form.role_id) fd.append('role_id', form.role_id);
-      if (form.name_ar) fd.append('name_ar', form.name_ar);
-      if (form.name_fr) fd.append('name_fr', form.name_fr);
-      if (form.name_en) fd.append('name_en', form.name_en);
-      fd.append('experience_years', String(form.experience_years||0));
-      if (form.description) fd.append('description', form.description);
-      if (form.description_ar) fd.append('description_ar', form.description_ar);
-      if (form.description_fr) fd.append('description_fr', form.description_fr);
-      if (form.description_en) fd.append('description_en', form.description_en);
-      fd.append('is_active', form.is_active ? '1':'0');
-      if (form.photo instanceof File) fd.append('photo', form.photo);
+      setError('');
       
-      const url = editing ? `${API_BASE_URL}/api/admin/securities/${editing.id}` : `${API_BASE_URL}/api/admin/securities`;
-      const method = 'POST'; // Toujours POST pour FormData
-      const headers = { 'Authorization': `Bearer ${token}`, 'Accept':'application/json' };
+      // Upload image if provided
+      let photoUrl = editing?.photo || editing?.photo_url || '';
+      if (form.photo instanceof File) {
+        console.log('[AdminSecurityCrud] Uploading new photo...');
+        photoUrl = await uploadImage(form.photo);
+      }
       
-      // Pour l'édition, ajouter _method=PUT
+      // Prepare data for Supabase
+      const securityData = {
+        full_name: form.name,
+        name: form.name, // Keep both for compatibility
+        name_ar: form.name_ar || null,
+        name_fr: form.name_fr || null,
+        name_en: form.name_en || null,
+        role_id: form.role_id || null,
+        experience_years: form.experience_years || 0,
+        description: form.description || null,
+        description_ar: form.description_ar || null,
+        description_fr: form.description_fr || null,
+        description_en: form.description_en || null,
+        is_active: form.is_active,
+        photo: photoUrl || null,
+        photo_url: photoUrl || null
+      };
+      
+      console.log('[AdminSecurityCrud] Saving security agent:', { editing: !!editing, data: securityData });
+      
+      let result;
       if (editing) {
-        fd.append('_method', 'PUT');
+        // Update existing
+        const { data, error } = await supabase
+          .from('securities')
+          .update(securityData)
+          .eq('id', editing.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      } else {
+        // Insert new
+        const { data, error } = await supabase
+          .from('securities')
+          .insert(securityData)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
       }
       
-      console.log(`${method} ${url}`, { editing: !!editing, formData: Object.fromEntries(fd) });
-      
-      const res = await fetch(url, { method, headers, body: fd });
-      console.log('Réponse reçue:', res.status, res.statusText);
-      
-      if (res.status === 401) { onAuthError?.(); return; }
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Erreur de réponse:', errorText);
-        throw new Error(`Échec de sauvegarde: ${res.status} - ${errorText}`);
-      }
-      
-      const responseData = await res.json();
-      console.log('Données de réponse:', responseData);
+      console.log('[AdminSecurityCrud] Save successful:', result);
       
       setShowForm(false); 
       setEditing(null); 
-      setForm({ name:'', role_id:'', experience_years:0, description:'', is_active:true, photo:null });
+      setForm({ name:'', name_ar:'', name_fr:'', name_en:'', role_id:'', experience_years:0, description:'', description_ar:'', description_fr:'', description_en:'', is_active:true, photo:null });
       await load();
     } catch (e2) { 
-      console.error('Erreur de sauvegarde:', e2);
-      setError(e2.message); 
+      console.error('[AdminSecurityCrud] Erreur de sauvegarde:', e2);
+      setError(e2.message || 'Erreur lors de la sauvegarde'); 
     }
   };
 
   const removeItem = async (item) => {
     if (!window.confirm('Supprimer cet agent ?')) return;
-    const res = await fetch(`${API_BASE_URL}/api/admin/securities/${item.id}`, { method:'DELETE', headers:{ 'Authorization': `Bearer ${token}` } });
-    if (res.status === 401) { onAuthError?.(); return; }
-    await load();
+    
+    try {
+      console.log('[AdminSecurityCrud] Deleting security agent:', item.id);
+      
+      const { error } = await supabase
+        .from('securities')
+        .delete()
+        .eq('id', item.id);
+      
+      if (error) {
+        console.error('[AdminSecurityCrud] Delete error:', error);
+        setError(`Erreur lors de la suppression: ${error.message}`);
+        return;
+      }
+      
+      console.log('[AdminSecurityCrud] Delete successful');
+      await load();
+    } catch (e) {
+      console.error('[AdminSecurityCrud] Exception during delete:', e);
+      setError(`Erreur: ${e.message}`);
+    }
   };
 
   return (
@@ -144,41 +248,138 @@ export default function AdminSecurityCrud({ token, onAuthError }) {
         </div>
       </div>
 
-      {error && (<div className="admin-crud-error">{error}</div>)}
+      {error && (
+        <div className="admin-crud-error" style={{
+          padding: '16px',
+          background: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          color: '#dc2626'
+        }}>
+          <div style={{ marginBottom: '12px' }}>
+            <strong style={{ display: 'block', marginBottom: '8px', fontSize: '16px' }}>
+              ⚠️ Erreur de connexion
+            </strong>
+            <div style={{ 
+              whiteSpace: 'pre-line', 
+              lineHeight: '1.6',
+              fontSize: '14px',
+              color: '#991b1b'
+            }}>
+              {error}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button 
+              onClick={load} 
+              disabled={loading}
+              style={{
+                padding: '8px 16px',
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                opacity: loading ? 0.6 : 1
+              }}
+            >
+              {loading ? 'Chargement...' : '🔄 Réessayer'}
+            </button>
+            <button 
+              onClick={() => {
+                console.log('[AdminSecurityCrud] Supabase connection test');
+                console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
+                console.log('Table: securities');
+              }}
+              style={{
+                padding: '8px 16px',
+                background: '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}
+            >
+              🔍 Voir les détails
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {loading && items.length === 0 && (
+        <div style={{padding: '20px', textAlign: 'center', color: '#64748b'}}>
+          Chargement en cours...
+        </div>
+      )}
+      
+      {!loading && items.length === 0 && !error && (
+        <div style={{padding: '20px', textAlign: 'center', color: '#64748b'}}>
+          Aucun agent de sécurité trouvé. Cliquez sur "+ Nouveau" pour en ajouter un.
+        </div>
+      )}
 
-      <div style={{overflow:'auto'}}>
-        <table className="security-admin-table">
-          <thead className="admin-thead">
-            <tr>
-              <th className="admin-th">#</th>
-              <th className="admin-th">Photo</th>
-              <th className="admin-th">Nom</th>
-              <th className="admin-th">Rôle</th>
-              <th className="admin-th">Expérience</th>
-              <th className="admin-th">Actif</th>
-              <th className="admin-th">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(it => (
-              <tr key={it.id}>
-                <td className="admin-td">{it.id}</td>
-                <td className="admin-td">{it.photo ? <img src={`${API_BASE_URL}${it.photo.startsWith('/')?it.photo:`/storage/${it.photo.replace(/^public\//,'')}`}`} alt={it.name} className="security-agent-photo" width={40} height={40}/> : <div className="security-agent-photo placeholder">👤</div>}</td>
-                <td className="admin-td">{it.name}</td>
-                <td className="admin-td">{it.role?.name||'-'}</td>
-                <td className="admin-td"><span className="security-experience">{it.experience_years||0} ans</span></td>
-                <td className="admin-td"><span className={`security-status-badge ${it.is_active ? 'active' : 'inactive'}`}>{it.is_active? 'Actif':'Inactif'}</span></td>
-                <td className="admin-td">
-                  <div className="security-actions">
-                    <button className="security-edit-btn" onClick={()=>openEdit(it)}>Éditer</button>
-                    <button className="security-delete-btn" onClick={()=>removeItem(it)}>Supprimer</button>
-                  </div>
-                </td>
+      {items.length > 0 && (
+        <div style={{overflow:'auto'}}>
+          <table className="security-admin-table">
+            <thead className="admin-thead">
+              <tr>
+                <th className="admin-th">#</th>
+                <th className="admin-th">Photo</th>
+                <th className="admin-th">Nom</th>
+                <th className="admin-th">Rôle</th>
+                <th className="admin-th">Expérience</th>
+                <th className="admin-th">Actif</th>
+                <th className="admin-th">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {items.map(it => (
+                <tr key={it.id}>
+                  <td className="admin-td">{it.id}</td>
+                  <td className="admin-td">
+                    {it.photo || it.photo_url ? (
+                      <img 
+                        src={it.photo_url || it.photo} 
+                        alt={it.name || it.full_name} 
+                        className="security-agent-photo" 
+                        width={40} 
+                        height={40}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextElementSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div className="security-agent-photo placeholder" style={{display: it.photo || it.photo_url ? 'none' : 'flex'}}>👤</div>
+                  </td>
+                  <td className="admin-td">{it.name || it.full_name}</td>
+                  <td className="admin-td">
+                    {it.role_id ? (
+                      (() => {
+                        const role = roles.find(r => r.id === it.role_id);
+                        return role ? (role.name || role.name_fr || role.name_ar || '-') : '-';
+                      })()
+                    ) : '-'}
+                  </td>
+                  <td className="admin-td"><span className="security-experience">{it.experience_years||0} ans</span></td>
+                  <td className="admin-td"><span className={`security-status-badge ${it.is_active ? 'active' : 'inactive'}`}>{it.is_active? 'Actif':'Inactif'}</span></td>
+                  <td className="admin-td">
+                    <div className="security-actions">
+                      <button className="security-edit-btn" onClick={()=>openEdit(it)}>Éditer</button>
+                      <button className="security-delete-btn" onClick={()=>removeItem(it)}>Supprimer</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {showForm && (
         <div className="security-form-overlay">

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './AdminSecurityEmployees.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminSecurityEmployees({ token, onAuthError }) {
   const [items, setItems] = useState([]);
@@ -9,28 +8,56 @@ export default function AdminSecurityEmployees({ token, onAuthError }) {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
 
-  const getToken = () => token || localStorage.getItem('adminToken');
-
   const load = async () => {
     try {
       setLoading(true);
       setError('');
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-employees`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Accept': 'application/json'
-        }
-      });
-      if (res.status === 401) {
-        onAuthError && onAuthError();
-        throw new Error('Non autorisé');
+      
+      console.log('[AdminSecurityEmployees] Loading security employees from Supabase...');
+      
+      // Load employees from Supabase
+      // Note: Security employees are stored in the employees table
+      // Load only non-validated employees (status != 'active' OR is_active != true)
+      // These are the employees waiting for validation
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('[AdminSecurityEmployees] Error loading employees:', error);
+        setError(`Erreur lors du chargement: ${error.message}`);
+        return;
       }
-      const data = await res.json();
-      if (!res.ok || data?.success === false) throw new Error(data.message || 'Load failed');
-      setItems(data.data || []);
+      
+      // Filter in JavaScript to get only non-validated employees
+      // (status != 'active' OR is_active != true)
+      const nonValidatedData = Array.isArray(data) ? data.filter(emp => {
+        return emp.status !== 'active' || emp.is_active !== true;
+      }) : [];
+      
+      console.log('[AdminSecurityEmployees] Loaded employees:', nonValidatedData?.length || 0, '(non-validated)');
+      
+      // Transform data to match expected format
+      const transformedData = Array.isArray(nonValidatedData) ? nonValidatedData.map(emp => {
+        const metadata = emp.metadata || {};
+        return {
+          id: emp.id,
+          first_name: metadata.first_name || emp.full_name?.split(' ')[0] || '',
+          last_name: metadata.last_name || emp.full_name?.split(' ').slice(1).join(' ') || '',
+          email: emp.email || '',
+          phone: emp.phone || '',
+          location: metadata.location || emp.address || '',
+          is_active: emp.status === 'active' || emp.is_active === true,
+          status: emp.status || 'pending',
+          ...emp
+        };
+      }) : [];
+      
+      setItems(transformedData);
     } catch (e) {
-      setError(e.message);
+      console.error('[AdminSecurityEmployees] Exception loading employees:', e);
+      setError(e.message || 'Impossible de charger les employés');
     } finally {
       setLoading(false);
     }
@@ -47,63 +74,115 @@ export default function AdminSecurityEmployees({ token, onAuthError }) {
 
   const toggleActive = async (id, next) => {
     try {
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-employees/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ is_active: !!next })
-      });
-      if (res.status === 401) { onAuthError && onAuthError(); return; }
-      if (res.ok) setItems(prev => prev.map(i => i.id === id ? { ...i, is_active: !!next } : i));
+      console.log('[AdminSecurityEmployees] Toggling active status for employee:', id, 'to', next);
+      
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          is_active: !!next,
+          status: next ? 'active' : 'inactive'
+        })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[AdminSecurityEmployees] Error updating employee:', error);
+        setError(`Erreur lors de la mise à jour: ${error.message}`);
+        return;
+      }
+      
+      setItems(prev => prev.map(i => i.id === id ? { ...i, is_active: !!next, status: next ? 'active' : 'inactive' } : i));
     } catch (e) {
-      console.error('Error toggling active:', e);
+      console.error('[AdminSecurityEmployees] Exception toggling active:', e);
+      setError(`Erreur: ${e.message}`);
     }
   };
 
   const validateEmployee = async (id) => {
     try {
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-employees-valid`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ employee_id: id })
-      });
-      if (res.status === 401) { onAuthError && onAuthError(); return; }
-      if (!res.ok) {
-        const err = await res.json().catch(()=>({message:'Erreur'}));
-        alert(err.message || 'Validation échouée');
+      console.log('[AdminSecurityEmployees] Validating employee:', id);
+      
+      // First, get the current employee data to verify
+      const { data: currentEmployee, error: fetchError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) {
+        console.error('[AdminSecurityEmployees] Error fetching employee:', fetchError);
+        alert(`Erreur lors de la récupération: ${fetchError.message}`);
         return;
       }
+      
+      console.log('[AdminSecurityEmployees] Current employee data:', {
+        id: currentEmployee.id,
+        status: currentEmployee.status,
+        is_active: currentEmployee.is_active
+      });
+      
+      // Update employee status to 'active' and is_active to true
+      // Also update updated_at to track validation date
+      const { data: updatedEmployees, error } = await supabase
+        .from('employees')
+        .update({ 
+          status: 'active',
+          is_active: true,
+          updated_at: new Date().toISOString() // Explicitly update updated_at for validation date
+        })
+        .eq('id', id)
+        .select();
+      
+      if (error) {
+        console.error('[AdminSecurityEmployees] Error validating employee:', error);
+        alert(`Erreur lors de la validation: ${error.message}`);
+        return;
+      }
+      
+      if (!updatedEmployees || updatedEmployees.length === 0) {
+        console.error('[AdminSecurityEmployees] No employee was updated. Check RLS policies.');
+        alert('Erreur: Aucun employé n\'a été mis à jour. Vérifiez les permissions RLS.');
+        return;
+      }
+      
+      const updatedEmployee = updatedEmployees[0];
+      console.log('[AdminSecurityEmployees] Employee validated successfully:', {
+        id: updatedEmployee.id,
+        status: updatedEmployee.status,
+        is_active: updatedEmployee.is_active,
+        updated_at: updatedEmployee.updated_at
+      });
+      
+      // Remove from list (as it's now validated and will appear in employees-valid page)
       setItems(prev => prev.filter(i => i.id !== id));
-      alert('Employé validé ✅');
+      alert('Employé validé ✅\nIl apparaîtra maintenant dans la liste des employés validés.');
     } catch (e) {
-      console.error('Validate error', e);
+      console.error('[AdminSecurityEmployees] Exception validating employee:', e);
+      alert(`Erreur: ${e.message}`);
     }
   };
 
   const remove = async (id) => {
     if (!window.confirm('Supprimer cet employé ?')) return;
+    
     try {
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-employees/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Accept': 'application/json'
-        }
-      });
-      if (res.status === 401) { onAuthError && onAuthError(); return; }
-      if (res.ok) setItems(prev => prev.filter(i => i.id !== id));
+      console.log('[AdminSecurityEmployees] Deleting employee:', id);
+      
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[AdminSecurityEmployees] Error deleting employee:', error);
+        setError(`Erreur lors de la suppression: ${error.message}`);
+        return;
+      }
+      
+      console.log('[AdminSecurityEmployees] Employee deleted successfully');
+      setItems(prev => prev.filter(i => i.id !== id));
     } catch (e) {
-      console.error('Error removing employee:', e);
+      console.error('[AdminSecurityEmployees] Exception deleting employee:', e);
+      setError(`Erreur: ${e.message}`);
     }
   };
 

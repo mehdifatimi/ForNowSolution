@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AdminJardinageReservationsCrud.css';
+import { supabase } from '../../lib/supabase';
 
 const AdminJardinageReservationsCrud = () => {
   const [reservations, setReservations] = useState([]);
@@ -20,22 +21,36 @@ const AdminJardinageReservationsCrud = () => {
   const loadReservations = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('adminToken');
-      const response = await fetch('http://localhost:8000/api/admin/jardinage-reservations', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setReservations(data.data || []);
+      setError('');
+      
+      console.log('[AdminJardinageReservations] Loading reservations from Supabase...');
+      
+      const { data: reservationsData, error: reservationsError } = await supabase
+        .from('jardinage_reservations')
+        .select(`
+          *,
+          service:jardins (
+            id,
+            name,
+            name_fr,
+            name_ar,
+            name_en,
+            price,
+            duration
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (reservationsError) {
+        console.error('[AdminJardinageReservations] Error loading reservations:', reservationsError);
+        setError(`Erreur lors du chargement: ${reservationsError.message}`);
       } else {
-        setError('Erreur lors du chargement des réservations');
+        console.log('[AdminJardinageReservations] Loaded reservations:', reservationsData?.length || 0);
+        setReservations(Array.isArray(reservationsData) ? reservationsData : []);
       }
     } catch (err) {
-      setError('Erreur de connexion');
+      console.error('[AdminJardinageReservations] Exception loading reservations:', err);
+      setError(`Erreur: ${err.message || 'Erreur de connexion'}`);
     } finally {
       setLoading(false);
     }
@@ -43,65 +58,70 @@ const AdminJardinageReservationsCrud = () => {
 
   const loadServices = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
-      const response = await fetch('http://localhost:8000/api/admin/jardinages', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setServices(data.data || []);
+      console.log('[AdminJardinageReservations] Loading services from Supabase...');
+      
+      const { data: servicesData, error: servicesError } = await supabase
+        .from('jardins')
+        .select('*')
+        .eq('is_active', true)
+        .order('order', { ascending: true });
+      
+      if (servicesError) {
+        console.error('[AdminJardinageReservations] Error loading services:', servicesError);
+      } else {
+        console.log('[AdminJardinageReservations] Loaded services:', servicesData?.length || 0);
+        setServices(Array.isArray(servicesData) ? servicesData : []);
       }
     } catch (err) {
-      console.error('Erreur lors du chargement des services:', err);
+      console.error('[AdminJardinageReservations] Exception loading services:', err);
     }
   };
 
   const handleStatusChange = async (reservationId, newStatus) => {
     try {
-      const token = localStorage.getItem('adminToken');
-      const response = await fetch(`http://localhost:8000/api/admin/jardinage-reservations/${reservationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (response.ok) {
-        await loadReservations();
+      console.log('[AdminJardinageReservations] Updating status:', reservationId, newStatus);
+      
+      const { error } = await supabase
+        .from('jardinage_reservations')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', reservationId);
+      
+      if (error) {
+        console.error('[AdminJardinageReservations] Error updating status:', error);
+        setError(`Erreur lors de la mise à jour: ${error.message}`);
       } else {
-        setError('Erreur lors de la mise à jour du statut');
+        console.log('[AdminJardinageReservations] Status updated successfully');
+        await loadReservations();
       }
     } catch (err) {
-      setError('Erreur de connexion');
+      console.error('[AdminJardinageReservations] Exception updating status:', err);
+      setError(`Erreur: ${err.message}`);
     }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette réservation ?')) {
       try {
-        const token = localStorage.getItem('adminToken');
-        const response = await fetch(`http://localhost:8000/api/admin/jardinage-reservations/${id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          await loadReservations();
+        console.log('[AdminJardinageReservations] Deleting reservation:', id);
+        
+        const { error } = await supabase
+          .from('jardinage_reservations')
+          .delete()
+          .eq('id', id);
+        
+        if (error) {
+          console.error('[AdminJardinageReservations] Error deleting reservation:', error);
+          setError(`Erreur lors de la suppression: ${error.message}`);
         } else {
-          setError('Erreur lors de la suppression');
+          console.log('[AdminJardinageReservations] Reservation deleted successfully');
+          await loadReservations();
         }
       } catch (err) {
-        setError('Erreur de connexion');
+        console.error('[AdminJardinageReservations] Exception deleting reservation:', err);
+        setError(`Erreur: ${err.message}`);
       }
     }
   };
@@ -116,9 +136,14 @@ const AdminJardinageReservationsCrud = () => {
     setSelectedReservation(null);
   };
 
-  const getServiceName = (serviceId) => {
+  const getServiceName = (serviceId, serviceData) => {
+    // Try to get name from joined service data first
+    if (serviceData) {
+      return serviceData.name || serviceData.name_fr || serviceData.name_ar || serviceData.name_en || 'Service inconnu';
+    }
+    // Fallback to services list
     const service = services.find(s => s.id === serviceId);
-    return service ? service.name : 'Service inconnu';
+    return service ? (service.name || service.name_fr || service.name_ar || service.name_en || 'Service inconnu') : 'Service inconnu';
   };
 
   const getStatusColor = (status) => {
@@ -144,7 +169,7 @@ const AdminJardinageReservationsCrud = () => {
   const filteredReservations = reservations.filter(reservation => {
     const clientName = reservation.client_name || '';
     const clientPhone = reservation.client_phone || '';
-    const serviceName = getServiceName(reservation.jardinage_service_id) || '';
+    const serviceName = getServiceName(reservation.jardinage_service_id, reservation.service) || '';
     
     const matchesSearch = 
       clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -251,9 +276,9 @@ const AdminJardinageReservationsCrud = () => {
                   <td>{reservation.id}</td>
                   <td className="client-name">{reservation.client_name}</td>
                   <td className="client-phone">{reservation.client_phone}</td>
-                  <td className="service-name">{getServiceName(reservation.jardinage_service_id)}</td>
+                  <td className="service-name">{getServiceName(reservation.jardinage_service_id, reservation.service)}</td>
                   <td className="reservation-date">
-                    {new Date(reservation.reservation_date).toLocaleDateString('fr-FR')}
+                    {reservation.reservation_date ? new Date(reservation.reservation_date).toLocaleDateString('fr-FR') : '-'}
                   </td>
                   <td className="reservation-hours">{reservation.hours}h</td>
                   <td className="reservation-total">{reservation.total_price} MAD</td>
@@ -350,12 +375,12 @@ const AdminJardinageReservationsCrud = () => {
                 
                 <div className="detail-item">
                   <label>Service:</label>
-                  <span>{getServiceName(selectedReservation.jardinage_service_id)}</span>
+                  <span>{getServiceName(selectedReservation.jardinage_service_id, selectedReservation.service)}</span>
                 </div>
                 
                 <div className="detail-item">
                   <label>Date de réservation:</label>
-                  <span>{new Date(selectedReservation.reservation_date).toLocaleDateString('fr-FR')}</span>
+                  <span>{selectedReservation.reservation_date ? new Date(selectedReservation.reservation_date).toLocaleDateString('fr-FR') : '-'}</span>
                 </div>
                 
                 <div className="detail-item">

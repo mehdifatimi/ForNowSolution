@@ -1,46 +1,109 @@
 import React, { useEffect, useState } from 'react';
 import './AdminSecurityEmployees.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+import { supabase } from '../../lib/supabase';
 
 export default function AdminSecurityEmployeesValid({ token, onAuthError }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const getToken = () => token || localStorage.getItem('adminToken');
-
   const load = async () => {
     try {
       setLoading(true);
       setError('');
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-employees-valid`, {
-        headers: { 'Authorization': `Bearer ${authToken}`, 'Accept': 'application/json' }
-      });
-      if (res.status === 401) { onAuthError && onAuthError(); throw new Error('Non autorisé'); }
-      const data = await res.json();
-      if (!res.ok || data?.success === false) throw new Error(data.message || 'Load failed');
-      setItems(data.data || []);
+      
+      console.log('[AdminSecurityEmployeesValid] Loading validated security employees from Supabase...');
+      
+      // Load all employees first, then filter in JavaScript
+      // This is more reliable than using .eq() which might not work with NULL values
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .order('updated_at', { ascending: false });
+      
+      if (error) {
+        console.error('[AdminSecurityEmployeesValid] Error loading employees:', error);
+        setError(`Erreur lors du chargement: ${error.message}`);
+        return;
+      }
+      
+      console.log('[AdminSecurityEmployeesValid] Total employees loaded:', data?.length || 0);
+      
+      // Filter validated employees: status = 'active' AND is_active = true
+      const validatedData = Array.isArray(data) ? data.filter(emp => {
+        const isStatusActive = emp.status === 'active';
+        const isActive = emp.is_active === true;
+        const isValidated = isStatusActive && isActive;
+        
+        if (isValidated) {
+          console.log('[AdminSecurityEmployeesValid] Found validated employee:', {
+            id: emp.id,
+            name: emp.full_name,
+            status: emp.status,
+            is_active: emp.is_active
+          });
+        }
+        
+        return isValidated;
+      }) : [];
+      
+      console.log('[AdminSecurityEmployeesValid] Validated employees:', validatedData?.length || 0);
+      
+      // Transform data to match expected format
+      const transformedData = Array.isArray(validatedData) ? validatedData.map(emp => {
+        const metadata = emp.metadata || {};
+        return {
+          id: emp.id,
+          first_name: metadata.first_name || emp.full_name?.split(' ')[0] || '',
+          last_name: metadata.last_name || emp.full_name?.split(' ').slice(1).join(' ') || '',
+          email: emp.email || '',
+          phone: emp.phone || '',
+          location: metadata.location || emp.address || '',
+          expertise: metadata.expertise || '-',
+          is_active: emp.is_active === true,
+          validated_at: emp.updated_at || emp.created_at, // Use updated_at as validation date
+          ...emp
+        };
+      }) : [];
+      
+      setItems(transformedData);
     } catch (e) {
-      setError(e.message);
-    } finally { setLoading(false); }
+      console.error('[AdminSecurityEmployeesValid] Exception loading employees:', e);
+      setError(e.message || 'Impossible de charger les employés validés');
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => { load(); }, []);
 
   const remove = async (id) => {
-    if (!window.confirm('Supprimer cette validation ?')) return;
+    if (!window.confirm('Supprimer cette validation ? (L\'employé sera désactivé)')) return;
+    
     try {
-      const authToken = getToken();
-      const res = await fetch(`${API_BASE_URL}/api/admin/security-employees-valid/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${authToken}`, 'Accept': 'application/json' }
-      });
-      if (res.status === 401) { onAuthError && onAuthError(); return; }
-      if (res.ok) setItems(prev => prev.filter(i => i.id !== id));
+      console.log('[AdminSecurityEmployeesValid] Deactivating employee:', id);
+      
+      // Instead of deleting, we'll deactivate the employee
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          status: 'inactive',
+          is_active: false
+        })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('[AdminSecurityEmployeesValid] Error deactivating employee:', error);
+        setError(`Erreur lors de la désactivation: ${error.message}`);
+        return;
+      }
+      
+      console.log('[AdminSecurityEmployeesValid] Employee deactivated successfully');
+      // Remove from list (as it's no longer validated)
+      setItems(prev => prev.filter(i => i.id !== id));
     } catch (e) {
-      console.error('Delete error', e);
+      console.error('[AdminSecurityEmployeesValid] Exception during deactivation:', e);
+      setError(`Erreur: ${e.message}`);
     }
   };
 
