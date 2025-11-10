@@ -272,22 +272,27 @@ export default function EmployeeRegister() {
       }
       
       // Prepare data for Supabase
+      // Note: Store additional fields in metadata JSONB since employees table has limited columns
       const employeeData = {
-        name: form.name,
-        prenom: form.prenom,
-        birth_date: form.birth_date,
-        age: Number(form.age),
-        email: form.email,
+        full_name: `${form.name} ${form.prenom}`.trim(),
+        email: form.email || null,
         phone: form.phone || null,
-        adresse: form.adresse,
-        competency_id: Number(form.competency_id),
-        auto_entrepreneur: form.auto_entrepreneur || null,
-        last_experience: form.last_experience || null,
-        company_name: form.company_name || null,
-        preferred_work_time: form.preferred_work_time || null,
-        jours_disponibles: Object.keys(selectedDaysPayload).length > 0 ? selectedDaysPayload : null,
+        address: form.adresse, // Map adresse to address
         photo: photoUrl || null,
-        status: 'pending'
+        photo_url: photoUrl || null,
+        status: 'pending',
+        metadata: {
+          name: form.name,
+          prenom: form.prenom,
+          birth_date: form.birth_date,
+          age: Number(form.age),
+          competency_id: Number(form.competency_id),
+          auto_entrepreneur: form.auto_entrepreneur || null,
+          last_experience: form.last_experience || null,
+          company_name: form.company_name || null,
+          preferred_work_time: form.preferred_work_time || null,
+          jours_disponibles: Object.keys(selectedDaysPayload).length > 0 ? selectedDaysPayload : null
+        }
       };
       
       console.log('[EmployeeRegister] Submitting employee data:', employeeData);

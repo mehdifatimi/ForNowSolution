@@ -188,7 +188,7 @@ export default function AdminEmployeesCrud({ token, onAuthError }) {
                 <td className="admin-td">{e.age}</td>
                 <td className="admin-td">{e.email}</td>
                 <td className="admin-td">{e.phone || '-'}</td>
-                <td className="admin-td">{e.adresse}</td>
+                <td className="admin-td">{e.address || e.metadata?.adresse || '-'}</td>
                 <td className="admin-td">
                   <span className="admin-badge employee-competency-badge">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -301,7 +301,7 @@ export default function AdminEmployeesCrud({ token, onAuthError }) {
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Adresse:</span>
-                  <span className="detail-value">{selectedEmployee.adresse || 'Non renseignée'}</span>
+                  <span className="detail-value">{selectedEmployee.address || selectedEmployee.metadata?.adresse || 'Non renseignée'}</span>
                 </div>
               </div>
 

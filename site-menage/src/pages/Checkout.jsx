@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '../lib/supabase';
 import './Shop.css';
 import PromoCode from '../components/PromoCode';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export default function Checkout() {
   const { t } = useTranslation();
@@ -49,29 +48,31 @@ export default function Checkout() {
     return subtotal * (1 - d / 100);
   }, [subtotal, promo]);
 
-  // Charger les détails d'un produit depuis l'API
+  // Charger les détails d'un produit depuis Supabase
   const fetchProductDetails = async (productId) => {
     if (productsCache[productId]) {
       return productsCache[productId];
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/products`, {
-        headers: { 'Accept': 'application/json' }
-      });
+      console.log('[Checkout] Fetching product details for:', productId);
+      const { data: product, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', parseInt(productId))
+        .single();
       
-      if (response.ok) {
-        const data = await response.json();
-        const products = Array.isArray(data) ? data : data.data || [];
-        const product = products.find(p => p.id === parseInt(productId));
-        
-        if (product) {
-          setProductsCache(prev => ({ ...prev, [productId]: product }));
-          return product;
-        }
+      if (error) {
+        console.error('[Checkout] Error fetching product:', error);
+        return null;
+      }
+      
+      if (product) {
+        setProductsCache(prev => ({ ...prev, [productId]: product }));
+        return product;
       }
     } catch (error) {
-      console.error('Error fetching product details:', error);
+      console.error('[Checkout] Exception fetching product details:', error);
     }
     
     return null;
@@ -125,43 +126,52 @@ export default function Checkout() {
         setLoading(true);
         setError('');
         
-        const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+        // Check Supabase Auth session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (token) {
-          // Utilisateur connecté: charger depuis l'API
-          const res = await fetch(`${API_BASE_URL}/api/cart`, {
-            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-          });
+        if (session && !sessionError) {
+          // Utilisateur connecté: charger depuis Supabase
+          console.log('[Checkout] Loading cart for authenticated user:', session.user.id);
           
-          if (res.ok) {
-            const data = await res.json();
-            setItems(data.data?.items || []);
-
-            // Charger le profil pour récupérer le nom de l'utilisateur
-            try {
-              const pres = await fetch(`${API_BASE_URL}/api/profile`, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-              });
-              if (pres.ok) {
-                const p = await pres.json();
-                const n = p?.user?.name || p?.data?.name || '';
-                if (n) setProfileName(n);
-              }
-            } catch {}
-          } else if (res.status === 401) {
-            // Token invalide, utiliser localStorage
-            localStorage.removeItem('auth_token');
-            sessionStorage.removeItem('auth_token');
-            await loadGuestCart();
-          } else {
+          const { data: cartData, error: cartError } = await supabase
+            .from('carts')
+            .select(`
+              *,
+              products (*)
+            `)
+            .eq('user_id', session.user.id);
+          
+          if (cartError) {
+            console.error('[Checkout] Error loading cart:', cartError);
             throw new Error(t('checkout.load_cart_error'));
           }
+          
+          // Transform cart data to match expected format
+          const cartItems = (cartData || []).map(item => ({
+            id: item.id,
+            product_id: item.product_id,
+            quantity: item.quantity || 1,
+            price: item.products?.price || 0,
+            product: item.products ? {
+              id: item.products.id,
+              name: item.products.name || item.products.name_fr || item.products.name_en || item.products.name_ar || t('checkout.product'),
+              description: item.products.description || item.products.description_fr || item.products.description_en || item.products.description_ar || '',
+              image: item.products.image || null
+            } : null
+          })).filter(item => item.product && item.price > 0); // Filter out deleted/zero-price products
+          
+          setItems(cartItems);
+
+          // Charger le profil pour récupérer le nom de l'utilisateur
+          const userName = session.user.user_metadata?.name || session.user.email?.split('@')[0] || '';
+          if (userName) setProfileName(userName);
         } else {
           // Utilisateur non connecté: charger depuis localStorage
+          console.log('[Checkout] Loading guest cart from localStorage');
           await loadGuestCart();
         }
       } catch (e) {
-        console.error('Error loading cart:', e);
+        console.error('[Checkout] Error loading cart:', e);
         setError(e.message || t('checkout.load_cart_error'));
         // Essayer de charger depuis localStorage en cas d'erreur
         await loadGuestCart();
@@ -223,65 +233,102 @@ export default function Checkout() {
     setSubmitting(true);
     setError('');
     
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-    
     try {
-      const payload = {
-        full_name: form.fullName,
-        email: form.email,
-        phone: form.phone,
-        address: form.address,
-        city: form.city,
-        zip: form.zip || undefined,
-        notes: form.notes || undefined,
-        payment_method: form.paymentMethod,
-        ...(form.paymentMethod === 'online' ? {
-          card_number: cardForm.number,
-          card_expiry: cardForm.expiry,
-          card_cvv: cardForm.cvv,
-          card_holder: cardForm.name
-        } : {})
-      };
-
-      // Si l'utilisateur n'est pas connecté, ajouter les éléments du panier depuis localStorage
-      if (!token) {
+      // Check Supabase Auth session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      // Prepare items array
+      let itemsArray = [];
+      
+      if (session && !sessionError) {
+        // For authenticated users, get items from Supabase cart
+        const { data: cartData, error: cartError } = await supabase
+          .from('carts')
+          .select('product_id, quantity')
+          .eq('user_id', session.user.id);
+        
+        if (cartError) {
+          console.error('[Checkout] Error loading cart items:', cartError);
+          throw new Error(t('checkout.load_cart_error'));
+        }
+        
+        itemsArray = (cartData || []).map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity || 1
+        }));
+      } else {
+        // For guest users, get items from localStorage
         const cartKey = 'guest_cart';
         const cart = JSON.parse(localStorage.getItem(cartKey) || '[]');
-        payload.items = cart.map(item => ({
+        itemsArray = cart.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity || 1
         }));
       }
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+      // Calculate total from items
+      const calculatedTotal = items.reduce((sum, item) => {
+        return sum + (toNumber(item.quantity) * toNumber(item.price));
+      }, 0);
+      
+      const finalTotal = promo?.discount 
+        ? calculatedTotal * (1 - Math.max(0, Math.min(100, Number(promo.discount))) / 100)
+        : calculatedTotal;
+
+      // Prepare order data
+      const orderData = {
+        user_id: session?.user?.id || null,
+        full_name: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        address: form.address,
+        city: form.city,
+        zip: form.zip || null,
+        notes: form.notes || null,
+        payment_method: form.paymentMethod,
+        status: 'pending',
+        total: finalTotal,
+        items: itemsArray // Store as JSONB
       };
 
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      console.log('[Checkout] Submitting order:', orderData);
+
+      // Insert order into Supabase
+      const { data: orderResult, error: orderError } = await supabase
+        .from('orders')
+        .insert(orderData)
+        .select()
+        .single();
+
+      if (orderError) {
+        console.error('[Checkout] Error creating order:', orderError);
+        throw new Error(orderError.message || t('checkout.confirm_error'));
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/orders`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = data?.message || t('checkout.confirm_error');
-        throw new Error(msg);
+      console.log('[Checkout] Order created successfully:', orderResult);
+      
+      // Clear cart after successful order
+      if (session && !sessionError) {
+        // Delete cart items for authenticated user
+        const { error: deleteError } = await supabase
+          .from('carts')
+          .delete()
+          .eq('user_id', session.user.id);
+        
+        if (deleteError) {
+          console.error('[Checkout] Error clearing cart:', deleteError);
+        }
+      } else {
+        // Clear localStorage for guest user
+        localStorage.removeItem('guest_cart');
       }
       
-      // Si succès et utilisateur non connecté, vider le panier localStorage
-      if (!token) {
-        localStorage.removeItem('guest_cart');
-        window.dispatchEvent(new CustomEvent('cartUpdated'));
-      }
+      // Dispatch cart update event
+      window.dispatchEvent(new CustomEvent('cartUpdated'));
       
       setOrderSuccess(true);
     } catch (e) {
+      console.error('[Checkout] Exception submitting order:', e);
       setError(e.message || t('checkout.confirm_error'));
     } finally {
       setSubmitting(false);

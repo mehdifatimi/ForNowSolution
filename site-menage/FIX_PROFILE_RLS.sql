@@ -22,6 +22,11 @@ CREATE POLICY "Allow authenticated users to insert orders"
 ON orders FOR INSERT TO authenticated
 WITH CHECK (auth.uid() = user_id);
 
+-- Policy للإدراج (INSERT) - للضيوف (guest users) - user_id يمكن أن يكون NULL
+CREATE POLICY "Allow public users to insert orders"
+ON orders FOR INSERT TO public
+WITH CHECK (user_id IS NULL OR auth.uid() = user_id);
+
 -- Policy للتحديث (UPDATE) - للمستخدمين المسجلين (يمكنهم تحديث طلباتهم فقط)
 CREATE POLICY "Allow authenticated users to update orders"
 ON orders FOR UPDATE TO authenticated
