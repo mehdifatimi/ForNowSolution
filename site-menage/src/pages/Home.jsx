@@ -6,12 +6,11 @@ import UserRating from '../components/UserRating';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
-import i18n from '../i18n';
 import TousLesServices from './TousLesServices';
 
 
 export default function Home() {
-  const { t, i18n: i18nInstance } = useTranslation();
+  const { t } = useTranslation();
   
   // Dynamic gallery data
   const [categories, setCategories] = useState([]);

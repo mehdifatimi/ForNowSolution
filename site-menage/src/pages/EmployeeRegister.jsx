@@ -251,7 +251,7 @@ export default function EmployeeRegister() {
         const fileName = `employee_${Date.now()}_${cleanFileName}`;
         const filePath = fileName;
         
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('employees')
           .upload(filePath, form.photo, {
             cacheControl: '3600',
@@ -298,7 +298,7 @@ export default function EmployeeRegister() {
       console.log('[EmployeeRegister] Submitting employee data:', employeeData);
       
       // Insert into Supabase
-      const { data: result, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('employees')
         .insert(employeeData)
         .select();

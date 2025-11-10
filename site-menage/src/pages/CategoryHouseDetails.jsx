@@ -7,7 +7,7 @@ import './Services.css';
 export default function CategoryHouseDetails() {
   const { serviceSlug, categorySlug } = useParams();
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t, i18n } = useTranslation(); // i18n is used in useEffect dependency
   const [service, setService] = useState(null);
   const [category, setCategory] = useState(null);
   const [types, setTypes] = useState([]);

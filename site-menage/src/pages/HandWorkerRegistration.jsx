@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translateHandWorkerCategories } from '../services/handWorkerTranslation';
-import i18n from '../i18n';
 import './HandWorkerRegistration.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 export default function HandWorkerRegistration() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -41,6 +40,7 @@ export default function HandWorkerRegistration() {
       const translatedCategories = translateHandWorkerCategories(categories, currentLanguage);
       setCategories(translatedCategories);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i18n.language]);
 
   const loadCategories = async () => {
