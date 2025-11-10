@@ -378,36 +378,134 @@
     display: none !important;
   }
   
-  /* Show hamburger on mobile */
+  /* Show hamburger on mobile - improved visibility and positioning */
   .navbar1__hamburger {
     display: inline-flex !important;
     visibility: visible !important;
     opacity: 1 !important;
+    position: absolute !important;
+    left: 12px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 10 !important;
+    width: 48px !important;
+    height: 40px !important;
+    min-width: 48px !important;
+    min-height: 40px !important;
+    background: #ffffff !important;
+    border: 1px solid rgba(229, 231, 235, 0.8) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+    border-radius: 8px !important;
+    padding: 8px 10px !important;
   }
   
-  /* Center logo on mobile or position it appropriately */
+  /* RTL Support - Position hamburger on the right in RTL mode */
+  .navbar1.rtl .navbar1__hamburger,
+  [dir="rtl"] .navbar1__hamburger {
+    left: auto !important;
+    right: 12px !important;
+  }
+  
+  /* Center logo on mobile - perfect centering both horizontally and vertically */
   .navbar1__brand {
-    flex: 1;
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    flex: 0 0 auto !important;
     display: flex !important;
-    justify-content: center;
-    align-items: center;
+    justify-content: center !important;
+    align-items: center !important;
+    width: auto !important;
+    margin: 0 !important;
+    z-index: 5 !important;
   }
   
   /* RTL Support - Center logo in RTL mode on mobile */
   .navbar1.rtl .navbar1__brand,
-  .navbar1__brand.rtl-brand {
-    justify-content: center;
+  .navbar1__brand.rtl-brand,
+  [dir="rtl"] .navbar1__brand {
+    left: 50% !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+    justify-content: center !important;
   }
   
-  /* Adjust navbar inner layout for mobile - only burger and logo */
+  /* Adjust navbar inner layout for mobile - ensure proper spacing */
   .navbar1__inner {
-    justify-content: space-between;
+    position: relative !important;
+    justify-content: space-between !important;
+    padding: 0 16px !important;
   }
   
   /* RTL Support - Adjust inner layout for RTL mode */
   .navbar1.rtl .navbar1__inner,
-  .navbar1__inner.rtl-inner {
-    flex-direction: row;
+  .navbar1__inner.rtl-inner,
+  [dir="rtl"] .navbar1__inner {
+    flex-direction: row !important;
+  }
+  
+  /* Ensure hamburger bars are visible on mobile */
+  .navbar1__hamburger {
+    gap: 5px !important;
+  }
+  
+  .navbar1__hamburger .bar {
+    width: 24px !important;
+    height: 3px !important;
+    background: rgb(56, 9, 223) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    border-radius: 2px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* Ensure bars spacing is even */
+  .navbar1__hamburger .bar-1 {
+    margin-bottom: 0 !important;
+  }
+  
+  .navbar1__hamburger .bar-2 {
+    margin: 0 !important;
+  }
+  
+  .navbar1__hamburger .bar-3 {
+    margin-top: 0 !important;
+  }
+  
+  /* Improve hamburger hover state on mobile */
+  .navbar1__hamburger:hover {
+    background: #ffffff !important;
+    border-color: #d1d5db !important;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06) !important;
+    transform: translateY(-50%) !important;
+  }
+  
+  .navbar1__hamburger:active {
+    background: #f9fafb !important;
+    border-color: #9ca3af !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    transform: translateY(-50%) scale(0.98) !important;
+  }
+  
+  /* Ensure smooth drawer animation on mobile */
+  .navbar1__drawer {
+    display: none;
+  }
+  
+  .navbar1__drawer.open {
+    display: block;
+  }
+  
+  /* Improve drawer opening animation on mobile */
+  .navbar1__drawer.open .navbar1__drawer-inner {
+    animation: slideInFromLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* RTL drawer animation on mobile */
+  .navbar1__drawer.rtl.open .navbar1__drawer-inner {
+    animation: slideInFromRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -754,16 +852,29 @@
   }
   
   .navbar1__inner {
-    padding: 0 12px;
+    padding: 0 16px;
+    position: relative;
   }
   
   .navbar1__title {
     font-size: 16px;
+    font-weight: 800;
+    white-space: nowrap;
   }
   
   .navbar1__logo {
     width: 24px;
     height: 24px;
+  }
+  
+  /* Ensure burger menu doesn't overlap with logo */
+  .navbar1__hamburger {
+    margin: 0 !important;
+  }
+  
+  /* Ensure logo is perfectly centered and doesn't overlap */
+  .navbar1__brand {
+    pointer-events: auto !important;
   }
   
   /* تحسينات القائمة المنبثقة للشاشات الصغيرة */
@@ -836,7 +947,7 @@
     opacity: 1 !important;
   }
   
-  /* Center logo on tablet and mobile */
+  /* Center logo on tablet and mobile - but only apply absolute positioning on mobile */
   .navbar1__brand {
     flex: 1;
     display: flex !important;
@@ -847,6 +958,27 @@
   /* Adjust navbar inner layout for tablet and mobile */
   .navbar1__inner {
     justify-content: space-between;
+  }
+}
+
+/* Tablet specific styles (between 769px and 991px) - keep original layout */
+@media (min-width: 769px) and (max-width: 991px) {
+  .navbar1__hamburger {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    transform: none !important;
+    order: 0;
+  }
+  
+  .navbar1__brand {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    flex: 1 !important;
+    order: 1;
   }
 }
 
