@@ -101,34 +101,8 @@ export default function Security() {
     role_id: null,
   });
 
-  useEffect(() => {
-    loadRoles();
-  }, []);
-
-  // Reload data when language changes
-  useEffect(() => {
-    loadRoles();
-    if (selectedRole) {
-      // Force reload role details with the new language
-      loadRoleDetails(selectedRole);
-    }
-    try {
-      // Persist current language just in case
-      localStorage.setItem('i18nextLng', i18n.language || 'fr');
-    } catch (_) {}
-  }, [i18n.language]);
-
-  // Prevent background scroll and ensure modals appear above navbar
-  useEffect(() => {
-    if (showReservationForm) {
-      const previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = previousOverflow; };
-    }
-    return undefined;
-  }, [showReservationForm]);
-
-  const loadRoles = async () => {
+  // Load roles function with useCallback to prevent unnecessary re-renders
+  const loadRoles = useCallback(async () => {
     try {
       setError('');
       setLoading(true);
@@ -144,26 +118,105 @@ export default function Security() {
       if (error) {
         console.error('[Security] Error loading roles:', error);
         setError(t('security_page.load_roles_error') + ': ' + error.message);
+        setRoles([]); // Ensure roles is set even on error
+        setLoading(false); // Make sure loading is set to false on error
         return;
       }
 
       console.log('[Security] Loaded roles:', data?.length || 0, 'roles');
       console.log('[Security] Roles data:', data);
-      setRoles(Array.isArray(data) ? data : []);
+      
+      // Ensure we set roles even if data is null/undefined
+      const rolesData = Array.isArray(data) ? data : [];
+      
+      // Set roles first, then loading to false
+      setRoles(rolesData);
+      console.log('[Security] Roles state updated, count:', rolesData.length);
+      
+      // Force a re-render by ensuring state update completes
+      if (rolesData.length === 0) {
+        console.warn('[Security] No roles found');
+      }
     } catch (e) {
       console.error('[Security] Exception loading roles:', e);
       setError(t('security_page.load_roles_error') + ': ' + e.message);
+      setRoles([]); // Ensure roles is set even on error
     } finally {
       setLoading(false);
+      console.log('[Security] Loading set to false');
     }
-  };
+  }, [t]);
+
+  // Initial load on mount - only once
+  useEffect(() => {
+    let isMounted = true;
+    let cancelled = false;
+    
+    const fetchData = async () => {
+      if (!isMounted || cancelled) return;
+      
+      try {
+        await loadRoles();
+      } catch (error) {
+        if (!cancelled) {
+          console.error('[Security] Error in initial load:', error);
+        }
+      }
+    };
+    
+    // Start loading immediately
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Reload data when language changes
+  useEffect(() => {
+    // Skip initial mount - only reload when language actually changes
+    const reloadData = async () => {
+      await loadRoles();
+      if (selectedRole) {
+        // Force reload role details with the new language
+        await loadRoleDetails(selectedRole);
+      }
+    };
+    
+    try {
+      // Persist current language just in case
+      localStorage.setItem('i18nextLng', i18n.language || 'fr');
+    } catch (_) {}
+    
+    // Only reload if we have roles already loaded (language change, not initial mount)
+    if (roles.length > 0 || selectedRole) {
+      reloadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i18n.language]);
+
+  // Prevent background scroll and ensure modals appear above navbar
+  useEffect(() => {
+    if (showReservationForm) {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = previousOverflow; };
+    }
+    return undefined;
+  }, [showReservationForm]);
 
   const loadRoleDetails = useCallback(async (roleId) => {
+    if (!roleId) return;
+    
     try {
       setError('');
       setLoading(true);
       
       console.log('[Security] Loading role details for role_id:', roleId);
+      
+      let role = null;
       
       // Reload roles if not loaded yet
       if (roles.length === 0) {
@@ -181,16 +234,19 @@ export default function Security() {
         const rolesList = Array.isArray(rolesData) ? rolesData : [];
         setRoles(rolesList);
         
-        const role = rolesList.find(r => r.id === roleId);
-        if (role) {
-          setSelectedRoleData(role);
-        }
+        role = rolesList.find(r => r.id === roleId);
       } else {
         // Find the role data
-        const role = roles.find(r => r.id === roleId);
-        if (role) {
-          setSelectedRoleData(role);
-        }
+        role = roles.find(r => r.id === roleId);
+      }
+      
+      if (role) {
+        setSelectedRoleData(role);
+        setSelectedRole(roleId);
+      } else {
+        console.warn('[Security] Role not found:', roleId);
+        setError(t('security_page.role_not_found') || 'Role not found');
+        return;
       }
       
       // Get first agent image for this role from securities table
@@ -247,8 +303,6 @@ export default function Security() {
       } else {
         setRoleImage('/nettoyage1.jpg');
       }
-      
-      setSelectedRole(roleId);
     } catch (e) { 
       console.error('[Security] Error loading role details:', e);
       setError(t('security_page.load_personnel_error') + ': ' + e.message); 
@@ -424,6 +478,14 @@ export default function Security() {
     }
   }, [reservationLoading, reservationForm, t]);
 
+  // Debug: Log current state on every render
+  console.log('[Security] Render state:', { 
+    loading, 
+    rolesCount: roles.length, 
+    selectedRole, 
+    error: !!error,
+    hasRoles: roles.length > 0
+  });
 
   return (
     <div className="shop-page">
@@ -457,46 +519,110 @@ export default function Security() {
         </header>
 
         {error && (
-          <div style={{color: 'red', textAlign: 'center', margin: '20px 0'}}>
+          <div style={{color: 'red', textAlign: 'center', margin: '20px 0', padding: '12px', background: '#fee2e2', borderRadius: '8px'}}>
             {error}
           </div>
         )}
 
-        {loading && (
+        {/* Loading state - only show when loading and no roles yet */}
+        {loading && roles.length === 0 && !error && (
           <div style={{textAlign: 'center', margin: '40px 0'}}>
-            {t('security_page.loading')}
+            <div style={{
+              display: 'inline-block',
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f4f6',
+              borderTop: '4px solid #667eea',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              marginBottom: '16px'
+            }}></div>
+            <p style={{color: '#64748b', fontSize: '0.95rem'}}>{t('security_page.loading')}</p>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
           </div>
         )}
 
-        {!selectedRole ? (
-          // Affichage des rôles
-          <div className="security-grid" data-aos="fade-up" data-aos-delay="300">
-            {roles.map((role, idx) => (
-              <article 
-                key={role.id} 
-                className="security-card role-card" 
-                data-aos="zoom-in" 
-                data-aos-delay={`${350 + idx * 80}`}
-                onClick={() => loadRoleDetails(role.id)}
-                style={{cursor: 'pointer'}}
-              >
-                <div className="security-top">
-                  
-                  <div>
-                    <h3 className="security-name">{role.name || getTranslatedRole(role.name) || t('security_page.role_not_available')}</h3>
-                    <p className="security-role">{t('security_page.click_to_see_agents')}</p>
-                  </div>
-                </div>
-                <p className="security-desc">{role.description || getTranslatedRoleDescription(role.name) || t('security_page.description_not_available')}</p>
-                <div className="security-meta">
-                  <span className="security-badge">{t('security_page.security_role')}</span>
-                </div>
-              </article>
-            ))}
+        {/* Empty state - no roles and not loading */}
+        {!loading && !selectedRole && roles.length === 0 && !error && (
+          <div style={{textAlign: 'center', margin: '40px 0', color: '#64748b'}}>
+            <p>{t('security_page.no_roles_available') || 'No security roles available'}</p>
           </div>
-        ) : (
+        )}
+
+        {/* Roles list - show when we have roles and no role is selected */}
+        {!selectedRole && roles.length > 0 && (
+          <div 
+            className="security-grid" 
+            data-aos="fade-up" 
+            data-aos-delay="300" 
+            key={`roles-grid-${roles.length}`}
+            style={{ 
+              display: 'grid',
+              visibility: 'visible',
+              opacity: 1
+            }}
+          >
+            {roles.map((role, idx) => {
+              if (!role || !role.id) {
+                console.warn('[Security] Invalid role at index:', idx, role);
+                return null;
+              }
+              return (
+                <article 
+                  key={role.id || `role-${idx}`}
+                  className="security-card role-card" 
+                  data-aos="zoom-in" 
+                  data-aos-delay={`${350 + idx * 80}`}
+                  onClick={() => loadRoleDetails(role.id)}
+                  style={{
+                    cursor: 'pointer',
+                    display: 'block',
+                    visibility: 'visible',
+                    opacity: 1
+                  }}
+                >
+                  <div className="security-top">
+                    <div>
+                      <h3 className="security-name">
+                        {role.name || getTranslatedRole(role.name) || t('security_page.role_not_available')}
+                      </h3>
+                      <p className="security-role">{t('security_page.click_to_see_agents')}</p>
+                    </div>
+                  </div>
+                  <p className="security-desc">
+                    {role.description || getTranslatedRoleDescription(role.name) || t('security_page.description_not_available')}
+                  </p>
+                  <div className="security-meta">
+                    <span className="security-badge">{t('security_page.security_role')}</span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        {selectedRole && (
           // Page de détail du rôle
-          selectedRoleData && (
+          loading && !selectedRoleData ? (
+            <div style={{textAlign: 'center', margin: '40px 0'}}>
+              <div style={{
+                display: 'inline-block',
+                width: '40px',
+                height: '40px',
+                border: '4px solid #f3f4f6',
+                borderTop: '4px solid #667eea',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                marginBottom: '16px'
+              }}></div>
+              <p style={{color: '#64748b', fontSize: '0.95rem'}}>{t('security_page.loading')}</p>
+            </div>
+          ) : selectedRoleData ? (
             <div className="role-detail-page">
               {/* Bouton de retour */}
               <button 
@@ -546,6 +672,21 @@ export default function Security() {
                 className="role-booking-button"
               >
                 🛡️ {t('security_page.book_role_now')}
+              </button>
+            </div>
+          ) : (
+            <div style={{textAlign: 'center', margin: '40px 0', color: '#64748b'}}>
+              <p>{t('security_page.role_not_found') || 'Role not found'}</p>
+              <button 
+                onClick={() => {
+                  setSelectedRole(null);
+                  setSelectedRoleData(null);
+                  setRoleImage(null);
+                }}
+                className="role-back-button"
+                style={{marginTop: '16px'}}
+              >
+                ← {t('security_page.back_to_roles')}
               </button>
             </div>
           )
@@ -601,7 +742,7 @@ export default function Security() {
               </div>
 
               {reservationForm.type_reservation === 'heure' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="time-inputs-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div className="evaluation-form-group">
                     <label>{t('security_page.start_time')}</label>
                     <input

@@ -709,16 +709,344 @@
 }
 
 @media (max-width: 768px) {
+  /* Page container fixes */
+  .shop-page {
+    padding: 1rem 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    overflow-x: hidden !important;
+  }
+
+  .shop-container {
+    padding: 0 0.75rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  /* Header fixes */
+  .shop-header {
+    margin-bottom: 1.5rem !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .shop-header-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+  }
+
+  .shop-title {
+    font-size: 1.75rem !important;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.3;
+  }
+
+  .shop-description {
+    font-size: 0.95rem !important;
+    line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Security grid fixes */
+  .security-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    margin-top: 24px !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  /* Security card fixes */
+  .security-card,
+  .role-card {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 20px !important;
+    margin: 0 !important;
+    box-sizing: border-box;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .security-card:hover,
+  .role-card:hover {
+    transform: none !important;
+  }
+
+  .security-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .security-name {
+    font-size: 1.25rem !important;
+    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .security-role {
+    font-size: 0.8rem !important;
+  }
+
+  .security-desc {
+    font-size: 0.9rem !important;
+    line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .security-badge {
+    font-size: 0.7rem !important;
+    padding: 6px 12px !important;
+  }
+
+  /* Role detail page fixes */
+  .role-detail-page {
+    padding: 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .role-back-button {
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 0.875rem;
+    margin-bottom: 16px;
+  }
+
+  .role-detail-title {
+    font-size: 1.75rem !important;
+    margin-bottom: 24px !important;
+    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
   .role-image-container {
-    height: 350px;
+    height: 250px !important;
+    margin-bottom: 24px !important;
+    width: 100% !important;
+    border-radius: 12px !important;
   }
-  
+
+  .role-image-text {
+    font-size: 1.25rem !important;
+    padding: 16px !important;
+  }
+
+  .role-description-section {
+    margin-bottom: 24px !important;
+  }
+
+  .role-description-text {
+    font-size: 1rem !important;
+    line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
   .role-key-info {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    margin-bottom: 24px !important;
   }
-  
+
+  .key-info-item {
+    padding: 12px !important;
+  }
+
+  .key-info-text {
+    font-size: 0.875rem !important;
+  }
+
   .role-booking-button {
-    font-size: 1rem;
-    padding: 16px 24px;
+    font-size: 1rem !important;
+    padding: 14px 20px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Modal fixes */
+  .evaluation-modal-overlay {
+    padding: 12px !important;
+    align-items: flex-start !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .evaluation-modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 95vh !important;
+    margin: auto !important;
+    border-radius: 12px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .evaluation-modal-header {
+    padding: 16px !important;
+    margin-bottom: 16px !important;
+    position: sticky;
+    top: 0;
+    background: var(--color-bg);
+    z-index: 10;
+  }
+
+  .evaluation-modal-header h3 {
+    font-size: 1.125rem !important;
+    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    padding-right: 32px;
+  }
+
+  .evaluation-modal-close {
+    font-size: 28px !important;
+    padding: 4px 8px !important;
+  }
+
+  .evaluation-form {
+    padding: 0 16px 16px 16px !important;
+    max-height: calc(95vh - 100px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .evaluation-form-group {
+    margin-bottom: 16px !important;
+  }
+
+  .evaluation-form-group label {
+    font-size: 0.8rem !important;
+    margin-bottom: 6px !important;
+  }
+
+  .evaluation-form-group input,
+  .evaluation-form-group select,
+  .evaluation-form-group textarea {
+    padding: 10px 12px !important;
+    font-size: 0.875rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .evaluation-form-group textarea {
+    min-height: 80px !important;
+  }
+
+  .evaluation-form-actions {
+    flex-direction: column !important;
+    gap: 10px !important;
+    margin-top: 20px !important;
+    position: sticky;
+    bottom: 0;
+    background: var(--color-bg);
+    padding-top: 12px;
+    z-index: 10;
+  }
+
+  .evaluation-cancel-btn,
+  .evaluation-submit-btn {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    font-size: 0.875rem !important;
+    min-height: 44px !important;
+  }
+
+  /* Fix for time inputs grid on mobile */
+  .time-inputs-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Toast notification fixes */
+  div[style*="position: fixed"][style*="top: 16"] {
+    top: 12px !important;
+    right: 12px !important;
+    left: 12px !important;
+    padding: 10px 12px !important;
+    font-size: 0.875rem !important;
+    max-width: calc(100% - 24px) !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .shop-page {
+    padding: 0.75rem 0 !important;
+  }
+
+  .shop-container {
+    padding: 0 0.5rem !important;
+  }
+
+  .shop-title {
+    font-size: 1.5rem !important;
+  }
+
+  .shop-description {
+    font-size: 0.875rem !important;
+  }
+
+  .security-card,
+  .role-card {
+    padding: 16px !important;
+  }
+
+  .security-name {
+    font-size: 1.125rem !important;
+  }
+
+  .role-detail-title {
+    font-size: 1.5rem !important;
+  }
+
+  .role-image-container {
+    height: 200px !important;
+  }
+
+  .role-image-text {
+    font-size: 1.125rem !important;
+    padding: 12px !important;
+  }
+
+  .evaluation-modal-overlay {
+    padding: 8px !important;
+  }
+
+  .evaluation-modal-header {
+    padding: 12px !important;
+  }
+
+  .evaluation-modal-header h3 {
+    font-size: 1rem !important;
+  }
+
+  .evaluation-form {
+    padding: 0 12px 12px 12px !important;
+  }
+
+  .evaluation-form-group input,
+  .evaluation-form-group select,
+  .evaluation-form-group textarea {
+    padding: 10px !important;
+    font-size: 0.8rem !important;
   }
 }
