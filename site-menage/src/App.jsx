@@ -60,14 +60,16 @@ export default function App() {
   const location = useLocation();
   
   useEffect(() => {
-    // Initialize AOS animations
+    // Initialize AOS animations - enabled on all devices including mobile
     AOS.init({
       duration: 800,
       easing: 'ease-in-out-cubic',
       once: true,
-      offset: 100,
-      delay: 100,
-      disable: 'mobile'
+      offset: 50, // Reduced offset for mobile to trigger animations earlier
+      delay: 50, // Reduced delay for mobile performance
+      disable: false, // Enable animations on all devices
+      mobile: true, // Explicitly enable on mobile
+      tablet: true // Enable on tablets too
     });
 
     // Scroll to element if hash present on route changes

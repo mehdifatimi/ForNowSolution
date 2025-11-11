@@ -3,6 +3,33 @@
   color: #0f172a; 
   background: #ffffff; 
   line-height: 1.6; 
+  width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Skeleton Loading Styles */
+.skeleton-button,
+.skeleton-text {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 25%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.1) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.skeleton-text {
+  display: block;
+  height: 20px;
+  border-radius: 4px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Remove unwanted spacing between Navbar and Hero on mobile */
@@ -39,14 +66,50 @@
     padding-top: 0 !important;
   }
 }
-* { box-sizing: border-box; }
+* { 
+  box-sizing: border-box; 
+}
+
 img { 
   max-width: 100%; 
+  height: auto;
   display: block; 
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
   image-rendering: optimize-contrast;
   filter: brightness(1.05) contrast(1.1) saturate(1.05) sharpness(1.1);
+}
+
+/* Prevent horizontal scroll on mobile */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
+
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Force AOS to show content on mobile */
+  [data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  
+  /* Ensure about section is visible even if AOS is disabled */
+  .about-us[data-aos],
+  .about-container[data-aos],
+  .about-card[data-aos],
+  .about-tagline[data-aos] {
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+    display: block !important;
+  }
 }
 h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 
@@ -63,9 +126,39 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   z-index: 1;
   padding: 64px 16px 160px;
   color: #ffffff;
-  overflow: hidden;
+  overflow: hidden; /* Keep hidden for background, but ensure content is visible */
   box-sizing: border-box;
   margin-top: 0;
+}
+
+/* Ensure animated elements are visible on mobile */
+@media (max-width: 768px) {
+  .home-hero {
+    overflow-x: hidden; /* Only hide horizontal overflow */
+    overflow-y: visible; /* Allow vertical overflow for animated elements */
+  }
+  
+  /* Ensure buttons container is visible */
+  .category-buttons-container,
+  .service-buttons-container {
+    overflow: visible !important; /* Ensure buttons are visible */
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  /* Ensure hero content is visible */
+  .home-hero-content {
+    visibility: visible !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+  }
+  
+  /* Ensure background image is visible */
+  .hero-background,
+  .background-image {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
 }
 
 /* Animated Background */
@@ -85,14 +178,35 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   background-position: center;
   background-repeat: no-repeat;
   transition: opacity 0.8s ease-in-out;
+  will-change: opacity; /* Optimize animation performance */
 }
 
 .background-image.fade-in {
   opacity: 1;
+  animation: fadeInBackground 0.8s ease-in-out forwards;
 }
 
 .background-image.fade-out {
   opacity: 0;
+  animation: fadeOutBackground 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeInBackground {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOutBackground {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* Service Selection Buttons */
@@ -164,6 +278,7 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 .category-button {
   min-width: fit-content;
   min-height: 48px;
+  min-height: 44px; /* Touch-friendly minimum height */
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -181,6 +296,9 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   white-space: nowrap;
   flex-shrink: 0;
   margin: 0;
+  touch-action: manipulation; /* Improve touch responsiveness */
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.2);
+  user-select: none;
 }
 
 .category-button {
@@ -225,6 +343,8 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   text-align: center;
   white-space: nowrap;
   text-transform: uppercase;
+  animation: iconFloat 3s ease-in-out infinite; /* Enable floating animation on all devices */
+  will-change: transform; /* Optimize animation performance */
 }
 
 /* Animation for service icons - floating effect */
@@ -240,6 +360,52 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   }
   75% {
     transform: translateY(-3px) rotate(-2deg);
+  }
+}
+
+/* Ensure animations work on mobile devices */
+@media (max-width: 768px) {
+  .service-label {
+    animation: iconFloat 3s ease-in-out infinite !important; /* Force animation on mobile */
+  }
+  
+  /* Ensure fade animations work on mobile */
+  .hero-title.fade-in,
+  .hero-description.fade-in,
+  .background-image.fade-in,
+  .service-button.fade-in {
+    animation: fadeIn 0.6s ease-out forwards !important;
+  }
+  
+  .hero-title.fade-out,
+  .hero-description.fade-out,
+  .background-image.fade-out,
+  .service-button.fade-out {
+    animation: fadeOut 0.3s ease-out forwards !important;
+  }
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade out animation */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }
 
@@ -278,11 +444,35 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 .service-button.fade-in {
   opacity: 1;
   transform: scale(1);
+  animation: fadeInScale 0.4s ease-out forwards;
 }
 
 .service-button.fade-out {
   opacity: 0;
   transform: scale(0.8);
+  animation: fadeOutScale 0.3s ease-out forwards;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeOutScale {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8);
+  }
 }
 .home-hero-content { 
   max-width: 960px; 
@@ -315,12 +505,36 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 .hero-description.fade-in {
   opacity: 1;
   transform: translateY(0);
+  animation: fadeInUp 0.6s ease-out forwards;
 }
 
 .hero-title.fade-out,
 .hero-description.fade-out {
   opacity: 0;
   transform: translateY(20px);
+  animation: fadeOutDown 0.3s ease-out forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
 }
 
 /* Button Container */
@@ -340,6 +554,7 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   color: #ffffff; 
   border: none; 
   padding: 14px 32px; 
+  min-height: 48px; /* Touch-friendly minimum height */
   border-radius: 28px; 
   font-weight: 600; 
   font-size: 16px;
@@ -353,6 +568,9 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   min-width: 160px;
   justify-content: center;
   white-space: nowrap;
+  touch-action: manipulation; /* Improve touch responsiveness */
+  -webkit-tap-highlight-color: rgba(59, 130, 246, 0.3);
+  user-select: none;
 }
 
 .home-primary-button:hover { 
@@ -373,6 +591,35 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 }
 
 /* Responsive Design */
+/* Tablet styles */
+@media (max-width: 992px) and (min-width: 769px) {
+  .about-us {
+    padding: 50px 16px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .about-container {
+    max-width: 100% !important;
+    padding: 0 12px;
+  }
+  
+  .about-highlights {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 20px !important;
+  }
+  
+  .gallery-description {
+    max-width: 90% !important;
+    padding: 0 12px;
+  }
+  
+  .about-tagline {
+    max-width: 90% !important;
+  }
+}
+
 @media (max-width: 992px) {
   .category-buttons-container,
   .service-buttons-container {
@@ -455,9 +702,20 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 
 @media (max-width: 768px) {
   .home-hero {
-    padding: 0 16px 120px;
+    padding: 0 12px 120px;
     min-height: 100vh;
+    min-height: 100dvh; /* Use dynamic viewport height for mobile */
     margin-top: 0 !important;
+    overflow-x: hidden;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .home-hero-content {
+    padding: 0 12px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   
   .category-buttons-container,
@@ -594,6 +852,17 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 @media (max-width: 480px) {
   .home-hero {
     padding: 32px 12px 140px;
+    min-height: 100dvh;
+  }
+  
+  .hero-title {
+    font-size: clamp(24px, 6vw, 32px);
+    margin-bottom: 12px;
+  }
+  
+  .hero-description {
+    font-size: clamp(14px, 3vw, 18px);
+    margin: 8px 0 20px;
   }
   
   .category-buttons-container,
@@ -746,24 +1015,53 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   .category-buttons-container {
     gap: 4px;
     padding: 6px 8px;
+    bottom: 50px;
   }
   
   .category-button {
-    padding: 6px 10px;
+    padding: 8px 12px;
     font-size: 9px;
-    min-height: 32px;
+    min-height: 40px; /* Keep touch-friendly */
   }
   
   .home-primary-button {
-    padding: 10px 18px;
-    font-size: 12px;
-    min-width: 120px;
+    padding: 12px 20px;
+    font-size: 13px;
+    min-width: 140px;
+    min-height: 44px; /* Keep touch-friendly */
+  }
+  
+  .home-hero {
+    padding: 24px 8px 120px;
+  }
+  
+  .home-hero-content {
+    padding: 0 8px;
   }
 }
 
 /* Sections */
-main section { padding: 64px 16px; }
-section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bottom: 28px; }
+main section { 
+  padding: 64px 16px; 
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  main section {
+    padding: 40px 12px;
+  }
+}
+
+section > h2 { 
+  text-align: center; 
+  font-size: clamp(22px, 3vw, 36px); 
+  margin-bottom: 28px; 
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 12px;
+}
 
 /* Services */
 .home-services { background: #f8fafc; }
@@ -843,13 +1141,24 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
 .step-number { font-size: 96px; font-weight: 800; color:#2f5061; line-height:1; }
 .step-photo { 
   width:100%; 
+  max-width: 100%;
   height:180px; 
+  min-height: 150px;
   border-radius:16px; 
   background-size: cover; 
   background-position:center; 
+  background-repeat: no-repeat;
   box-shadow: 0 8px 24px rgba(15,23,42,.08);
   filter: brightness(1.1) contrast(1.15) saturate(1.1) sharpness(1.2);
   transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .step-photo {
+    height: 150px;
+    min-height: 120px;
+  }
 }
 
 .step-photo:hover {
@@ -890,6 +1199,7 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
 }
 .expertise-image img {
   width: 100%;
+  max-width: 100%;
   height: auto;
   border-radius: 16px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
@@ -898,6 +1208,9 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
   image-rendering: optimize-contrast;
   filter: brightness(1.1) contrast(1.15) saturate(1.1) sharpness(1.2);
   transition: all 0.3s ease;
+  display: block;
+  object-fit: cover;
+  box-sizing: border-box;
 }
 
 .expertise-image img:hover {
@@ -1192,12 +1505,23 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
 .about-us {
   padding: 60px 20px;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  width: 100%;
+  box-sizing: border-box;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  overflow-x: hidden;
 }
 
 .about-container {
   max-width: 1200px;
   margin: 0 auto;
   text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .about-highlights {
@@ -1254,6 +1578,19 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
   padding: 12px 20px;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gallery-description {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Scroll-to-top button - floating, modern design */
@@ -1320,7 +1657,10 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
   .home-services-grid { 
     grid-template-columns: 1fr !important; 
     gap: 16px; 
-    padding: 16px 0;
+    padding: 16px 12px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
   }
   
   .home-service-card {
@@ -1329,6 +1669,9 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
     visibility: visible !important;
     opacity: 1 !important;
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    touch-action: manipulation;
   }
   
   .service-card-link {
@@ -1336,31 +1679,137 @@ section > h2 { text-align: center; font-size: clamp(22px, 3vw, 36px); margin-bot
     visibility: visible !important;
     opacity: 1 !important;
     width: 100%;
+    min-height: 44px; /* Touch-friendly */
+    touch-action: manipulation;
   }
 
   .about-us {
-    padding: 40px 16px;
+    padding: 40px 12px !important;
+    width: 100% !important;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+  
+  .about-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 8px;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .gallery-title {
+    font-size: clamp(20px, 4vw, 32px) !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    margin-bottom: 16px !important;
+  }
+  
+  .gallery-description {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 8px;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    font-size: clamp(14px, 2.5vw, 16px);
+    line-height: 1.6;
+  }
+  
+  .about-tagline {
+    font-size: clamp(16px, 3vw, 18px) !important;
+    max-width: 100% !important;
+    width: calc(100% - 16px) !important;
+    margin: 16px auto 24px !important;
+    padding: 12px 16px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    border-left: 3px solid #3b82f6;
   }
 
   .about-highlights {
     grid-template-columns: 1fr !important;
-    gap: 16px;
-    margin-top: 24px;
+    gap: 16px !important;
+    margin-top: 24px !important;
+    width: 100% !important;
+    box-sizing: border-box;
+    display: grid !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   
   .about-card {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
-    padding: 20px;
+    padding: 20px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    position: relative !important;
+    transform: none !important;
   }
   
   .about-card h3 {
-    font-size: 1.1rem;
+    font-size: 1.1rem !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   
   .about-card p {
-    font-size: 0.9rem;
+    font-size: 0.9rem !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .about-card .icon {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  .process {
+    padding: 40px 12px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+  
+  .process-steps {
+    grid-template-columns: 1fr !important;
+    gap: 20px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .expertise {
+    padding: 40px 12px;
+    margin: 20px auto;
+    width: calc(100% - 24px);
+    max-width: calc(100% - 24px);
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+  
+  .expertise-content {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .expertise-image {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
   }
 }
 

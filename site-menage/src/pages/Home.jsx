@@ -20,6 +20,7 @@ export default function Home() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [hiddenButtons, setHiddenButtons] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   
   // Gallery slider state
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -27,6 +28,11 @@ export default function Home() {
   
   // Scroll-to-top button state
   const [showScrollTop, setShowScrollTop] = useState(false);
+  
+  // Ensure component is mounted before rendering dynamic content
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   // Helper function to get image URL from Supabase Storage
   const getImageUrl = React.useCallback((imagePath) => {
@@ -82,6 +88,8 @@ export default function Home() {
   
   // Load categories and gallery images from Supabase
   useEffect(() => {
+    let isMounted = true;
+    
     const loadData = async () => {
       try {
         setLoading(true);
@@ -93,6 +101,8 @@ export default function Home() {
           .select('*')
           .eq('is_active', true)
           .order('created_at', { ascending: true });
+        
+        if (!isMounted) return;
         
         if (categoriesError) {
           console.error('Error loading categories:', categoriesError);
@@ -118,6 +128,8 @@ export default function Home() {
           .select('*')
           .order('created_at', { ascending: false });
         
+        if (!isMounted) return;
+        
         if (imagesError) {
           console.error('Error loading gallery images:', imagesError);
         } else if (imagesData) {
@@ -131,11 +143,17 @@ export default function Home() {
       } catch (error) {
         console.error('Error loading gallery data:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     
     loadData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [i18n.language, getImageUrl]);
 
   // Load images for selected category
@@ -338,6 +356,42 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categories.length, selectedCategory?.id, isPlaying, isTransitioning]);
   
+  // Don't render dynamic content until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="Home">
+        <header className="home-hero">
+          <div className="hero-background">
+            <div className="background-image" style={{ background: '#1e293b' }} />
+          </div>
+          <div className="home-hero-content">
+            <h1 className="hero-title fade-in">
+              {t('home_page.hero.title', 'Bienvenue')}
+            </h1>
+            <p className="hero-description fade-in">
+              {t('home_page.hero.subtitle', 'Services de nettoyage professionnels')}
+            </p>
+            <div className="button-container">
+              <Link to="/tous-les-services" className="home-primary-button" aria-label={t('home_page.buttons.book_now')}>
+                <span className="icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+                {t('home_page.buttons.book_now')}
+              </Link>
+            </div>
+          </div>
+        </header>
+        <main>
+          <section className="home-services" id="nos-services">
+            <TousLesServices />
+          </section>
+        </main>
+      </div>
+    );
+  }
+  
   return (
     <div className="Home">
       <header className="home-hero">
@@ -362,7 +416,15 @@ export default function Home() {
         )}
 
         {/* Category Selection Buttons */}
-        {categories.length > 0 && (
+        {loading ? (
+          <div className="service-buttons-container category-buttons-container">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="category-button skeleton-button" aria-hidden="true">
+                <span className="service-label skeleton-text"></span>
+              </div>
+            ))}
+          </div>
+        ) : categories.length > 0 ? (
           <div className="service-buttons-container category-buttons-container">
             {categories.map((category) => (
               <button
@@ -370,15 +432,25 @@ export default function Home() {
                 className={`service-button category-button ${selectedCategory?.id === category.id ? 'active' : ''} ${hiddenButtons.has(category.id) ? 'fade-out' : 'fade-in'}`}
                 onClick={() => handleCategorySelect(category)}
                 title={category.name}
+                aria-label={category.name}
+                type="button"
               >
                 <span className="service-label">{category.name}</span>
               </button>
             ))}
           </div>
-        )}
+        ) : null}
 
         {/* Hero Content */}
-        {selectedCategory && currentImage && (
+        {loading ? (
+          <div className="home-hero-content">
+            <div className="hero-title skeleton-text" style={{ width: '60%', margin: '0 auto 16px', height: '48px' }} aria-hidden="true"></div>
+            <div className="hero-description skeleton-text" style={{ width: '80%', margin: '0 auto 24px', height: '24px' }} aria-hidden="true"></div>
+            <div className="button-container">
+              <div className="home-primary-button skeleton-button" style={{ width: '180px', height: '48px' }} aria-hidden="true"></div>
+            </div>
+          </div>
+        ) : selectedCategory && currentImage ? (
           <div className="home-hero-content">
             <h1 className={`hero-title ${isTransitioning ? 'fade-out' : 'fade-in'}`}>
               {selectedCategory.name}
@@ -389,8 +461,27 @@ export default function Home() {
               </p>
             )}
             <div className="button-container">
-              <Link to="/tous-les-services" className="home-primary-button">
-                <span className="icon" aria-hidden>
+              <Link to="/tous-les-services" className="home-primary-button" aria-label={t('home_page.buttons.book_now')}>
+                <span className="icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+                {t('home_page.buttons.book_now')}
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="home-hero-content">
+            <h1 className="hero-title fade-in">
+              {t('home_page.hero.title', 'Bienvenue')}
+            </h1>
+            <p className="hero-description fade-in">
+              {t('home_page.hero.subtitle', 'Services de nettoyage professionnels')}
+            </p>
+            <div className="button-container">
+              <Link to="/tous-les-services" className="home-primary-button" aria-label={t('home_page.buttons.book_now')}>
+                <span className="icon" aria-hidden="true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
@@ -406,31 +497,33 @@ export default function Home() {
           
           <TousLesServices />
         </section>
-        <section className="about-us" id="about">
-          <div className="about-container" data-aos="fade-up" data-aos-delay="100">
-            <h2 className="gallery-title" style={{marginBottom: 8}}>{t('home_page.about.title')}</h2>
-            <div className="gallery-description" style={{maxWidth: 820, margin: '0 auto 16px'}}>
-            <p className="about-tagline" data-aos="fade-up" data-aos-delay="120">
-              {t('home_page.about.tagline')}
-            </p>
-              {t('home_page.about.description')}
+        <section className="about-us" id="about" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+          <div className="about-container" data-aos="fade-up" data-aos-delay="100" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+            <h2 className="gallery-title" style={{marginBottom: 8, display: 'block', visibility: 'visible', opacity: 1}}>{t('home_page.about.title')}</h2>
+            <div className="gallery-description" style={{maxWidth: 820, margin: '0 auto 16px', display: 'block', visibility: 'visible', opacity: 1}}>
+              <p className="about-tagline" data-aos="fade-up" data-aos-delay="120" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                {t('home_page.about.tagline')}
+              </p>
+              <div style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                {t('home_page.about.description')}
+              </div>
             </div>
             
-            <div className="about-highlights">
-              <div className="about-card" data-aos="fade-up" data-aos-delay="150">
-                <div className="icon">✅</div>
-                <h3>{t('home_page.about.highlights.guaranteed_quality.title')}</h3>
-                <p>{t('home_page.about.highlights.guaranteed_quality.description')}</p>
+            <div className="about-highlights" style={{ display: 'grid', visibility: 'visible', opacity: 1 }}>
+              <div className="about-card" data-aos="fade-up" data-aos-delay="150" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                <div className="icon" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>✅</div>
+                <h3 style={{ display: 'block', visibility: 'visible', opacity: 1 }}>{t('home_page.about.highlights.guaranteed_quality.title')}</h3>
+                <p style={{ display: 'block', visibility: 'visible', opacity: 1 }}>{t('home_page.about.highlights.guaranteed_quality.description')}</p>
               </div>
-              <div className="about-card" data-aos="fade-up" data-aos-delay="200">
-                <div className="icon">🧪</div>
-                <h3>{t('home_page.about.highlights.ecological_products.title')}</h3>
-                <p>{t('home_page.about.highlights.ecological_products.description')}</p>
+              <div className="about-card" data-aos="fade-up" data-aos-delay="200" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                <div className="icon" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>🧪</div>
+                <h3 style={{ display: 'block', visibility: 'visible', opacity: 1 }}>{t('home_page.about.highlights.ecological_products.title')}</h3>
+                <p style={{ display: 'block', visibility: 'visible', opacity: 1 }}>{t('home_page.about.highlights.ecological_products.description')}</p>
               </div>
-              <div className="about-card" data-aos="fade-up" data-aos-delay="250">
-                <div className="icon">⏱️</div>
-                <h3>{t('home_page.about.highlights.rapid_intervention.title')}</h3>
-                <p>{t('home_page.about.highlights.rapid_intervention.description')}</p>
+              <div className="about-card" data-aos="fade-up" data-aos-delay="250" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                <div className="icon" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>⏱️</div>
+                <h3 style={{ display: 'block', visibility: 'visible', opacity: 1 }}>{t('home_page.about.highlights.rapid_intervention.title')}</h3>
+                <p style={{ display: 'block', visibility: 'visible', opacity: 1 }}>{t('home_page.about.highlights.rapid_intervention.description')}</p>
               </div>
             </div>
           </div>
@@ -479,7 +572,10 @@ export default function Home() {
             <div className="expertise-image" data-aos="fade-left" data-aos-delay="300">
               <img 
                 src={`${(process.env.PUBLIC_URL || '') + '/galerie/' + encodeURIComponent('خبرتي – نهجنا البيئي.jpeg')}`} 
-                alt={t('home_page.expertise.image_alt')} 
+                alt={t('home_page.expertise.image_alt')}
+                loading="lazy"
+                decoding="async"
+                style={{ width: '100%', height: 'auto', display: 'block' }}
               />
             </div>
           </div>

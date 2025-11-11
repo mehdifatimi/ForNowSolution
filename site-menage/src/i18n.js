@@ -26,7 +26,10 @@ i18n
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
     },
-    
+    // تعطيل Suspense لضمان عرض الترجمات مباشرة بدون انتظار
+    react: {
+      useSuspense: false,
+    },
     // إعدادات الترجمة التلقائية
     saveMissing: true,
     missingKeyHandler: (lng, ns, key, fallbackValue) => {
@@ -37,12 +40,15 @@ i18n
 
 // Function to change language and update document direction
 i18n.on('languageChanged', (lng) => {
+  // تطبيع اللغة (إزالة أي suffixes مثل -US أو _FR)
+  const normalizedLng = lng ? lng.split(/[-_]/)[0].toLowerCase() : 'fr';
+  
   // تحديث اللغة في خدمة الترجمة
-  translationService.setLanguage(lng);
+  translationService.setLanguage(normalizedLng);
   
   if (typeof document !== 'undefined') {
-    document.documentElement.setAttribute('lang', lng);
-    if (lng === 'ar') {
+    document.documentElement.setAttribute('lang', normalizedLng);
+    if (normalizedLng === 'ar') {
       document.documentElement.setAttribute('dir', 'rtl');
       document.body.classList.add('rtl');
     } else {
@@ -53,17 +59,42 @@ i18n.on('languageChanged', (lng) => {
 });
 
 // Set initial direction on load (only if document is available)
+// Since resources are imported directly, i18n.init() is synchronous
+// So we can set the initial language immediately
 if (typeof document !== 'undefined') {
-  const initialLng = localStorage.getItem('i18nextLng') || 'fr';
-  translationService.setLanguage(initialLng);
+  const setInitialLanguage = () => {
+    // Get language from i18n (already detected by LanguageDetector) or fallback
+    const initialLng = i18n.language || localStorage.getItem('i18nextLng') || 'fr';
+    const normalizedLng = initialLng ? initialLng.split(/[-_]/)[0].toLowerCase() : 'fr';
+    
+    // Normalize and set language if needed
+    if (i18n.language !== normalizedLng) {
+      // Use changeLanguage to trigger languageChanged event
+      i18n.changeLanguage(normalizedLng).catch(() => {
+        // Fallback: set directly if changeLanguage fails
+        i18n.language = normalizedLng;
+        // Manually trigger languageChanged event
+        i18n.emit('languageChanged', normalizedLng);
+      });
+    } else {
+      // Language is already correct, just update document attributes
+      translationService.setLanguage(normalizedLng);
+      document.documentElement.setAttribute('lang', normalizedLng);
+      if (normalizedLng === 'ar') {
+        document.documentElement.setAttribute('dir', 'rtl');
+        document.body.classList.add('rtl');
+      } else {
+        document.documentElement.setAttribute('dir', 'ltr');
+        document.body.classList.remove('rtl');
+      }
+    }
+  };
   
-  if (initialLng === 'ar') {
-    document.documentElement.setAttribute('dir', 'rtl');
-    document.body.classList.add('rtl');
-  } else {
-    document.documentElement.setAttribute('dir', 'ltr');
-    document.body.classList.remove('rtl');
-  }
+  // Set immediately - i18n should be initialized synchronously
+  setInitialLanguage();
+  
+  // Also set after a microtask to ensure it runs after any async operations
+  Promise.resolve().then(setInitialLanguage);
 }
 
 export default i18n;
