@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import CategoryCard from '../components/CategoryCard';
@@ -14,9 +14,86 @@ export default function HandWorkers() {
   const [error, setError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
 
+  // Load categories function with useCallback
+  const loadCategories = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      console.log('[HandWorkers] Loading categories from Supabase');
+      
+      const { data, error } = await supabase
+        .from('hand_worker_categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('order', { ascending: true });
+      
+      if (error) {
+        console.error('[HandWorkers] Error loading categories:', error);
+        setError(t('hand_workers.loading_error') + ': ' + error.message);
+        setCategories([]); // Ensure categories is set even on error
+        setLoading(false); // Make sure loading is set to false on error
+        return;
+      }
+      
+      console.log('[HandWorkers] Loaded categories:', data?.length || 0);
+      console.log('[HandWorkers] Categories data:', data);
+      
+      // Ensure we set categories even if data is null/undefined
+      const categoriesData = Array.isArray(data) ? data : [];
+      
+      // Set categories first, then loading to false
+      setCategories(categoriesData);
+      console.log('[HandWorkers] Categories state updated, count:', categoriesData.length);
+      
+      // Force a re-render by ensuring state update completes
+      if (categoriesData.length === 0) {
+        console.warn('[HandWorkers] No categories found');
+      }
+    } catch (e) {
+      console.error('[HandWorkers] Exception loading categories:', e);
+      setError(t('hand_workers.loading_error') + ': ' + e.message);
+      setCategories([]); // Ensure categories is set even on error
+    } finally {
+      setLoading(false);
+      console.log('[HandWorkers] Loading set to false');
+    }
+  }, [t]);
+
+  // Initial load on mount - only once
   useEffect(() => {
-    loadCategories();
-  }, []);
+    let isMounted = true;
+    let cancelled = false;
+    
+    const fetchData = async () => {
+      if (!isMounted || cancelled) {
+        console.log('[HandWorkers] Component unmounted or cancelled, skipping fetch');
+        return;
+      }
+      
+      try {
+        console.log('[HandWorkers] Starting initial data fetch...');
+        await loadCategories();
+        console.log('[HandWorkers] Initial data fetch completed');
+      } catch (error) {
+        if (!cancelled && isMounted) {
+          console.error('[HandWorkers] Error in initial load:', error);
+          setError(t('hand_workers.loading_error') + ': ' + (error.message || 'Unknown error'));
+          setLoading(false);
+        }
+      }
+    };
+    
+    // Start loading immediately
+    fetchData();
+    
+    return () => {
+      console.log('[HandWorkers] Cleanup: cancelling fetch');
+      isMounted = false;
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Persist language and set direction when language changes
   useEffect(() => {
@@ -25,6 +102,45 @@ export default function HandWorkers() {
     const dir = lang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', dir);
   }, [i18n.language]);
+
+  // Ensure header is visible immediately on mount (before any async operations)
+  useEffect(() => {
+    // Force header visibility immediately - this runs synchronously on mount
+    const forceVisibility = () => {
+      const header = document.querySelector('.hand-workers-header');
+      const titleSection = document.querySelector('.hand-workers-title-section');
+      const title = document.querySelector('.hand-workers-title');
+      const subtitle = document.querySelector('.hand-workers-subtitle');
+      const actions = document.querySelector('.hand-workers-actions');
+      
+      [header, titleSection, title, subtitle, actions].forEach(el => {
+        if (el) {
+          el.style.display = el === actions ? 'flex' : 'block';
+          el.style.visibility = 'visible';
+          el.style.opacity = '1';
+          el.style.animation = 'none';
+          el.style.transform = 'none';
+        }
+      });
+    };
+    
+    // Run immediately
+    forceVisibility();
+    
+    // Also run after a tiny delay to ensure it overrides any CSS animations
+    const timeoutId = setTimeout(forceVisibility, 10);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  // Force re-render when categories are loaded (for mobile compatibility)
+  useEffect(() => {
+    if (categories.length > 0 && !loading) {
+      console.log('[HandWorkers] Categories loaded, forcing visibility check');
+      // Force a re-render by updating a dummy state if needed
+      // This helps ensure content is visible on mobile
+    }
+  }, [categories.length, loading]);
 
   const getCurrentLang = () => (localStorage.getItem('currentLang') || i18n.language || 'fr').split(/[-_]/)[0].toLowerCase();
 
@@ -77,35 +193,6 @@ export default function HandWorkers() {
     return null;
   };
 
-  const loadCategories = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      console.log('[HandWorkers] Loading categories from Supabase');
-      
-      const { data, error } = await supabase
-        .from('hand_worker_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('order', { ascending: true });
-      
-      if (error) {
-        console.error('[HandWorkers] Error loading categories:', error);
-        setError(t('hand_workers.loading_error') + ': ' + error.message);
-        return;
-      }
-      
-      console.log('[HandWorkers] Loaded categories:', data?.length || 0);
-      setCategories(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error('[HandWorkers] Exception loading categories:', e);
-      setError(t('hand_workers.loading_error') + ': ' + e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loadHandWorkers = async (categoryId) => {
     try {
       console.log('[HandWorkers] Loading hand workers for category:', categoryId);
@@ -140,39 +227,182 @@ export default function HandWorkers() {
     setHandWorkers([]);
   };
 
-  if (loading) return <div className="loading-state">{t('hand_workers.loading')}</div>;
-  if (error) return <div className="error-state">{error}</div>;
+  // Debug: Log current state on every render
+  console.log('[HandWorkers] Render state:', { 
+    loading, 
+    categoriesCount: categories.length, 
+    selectedCategory: !!selectedCategory,
+    error: !!error,
+    hasCategories: categories.length > 0
+  });
 
   return (
     <main className="hand-workers-page">
-              <div className="hand-workers-header">
-                <div className="hand-workers-title-section">
-                  <h1 className="hand-workers-title" data-aos="fade-up" data-aos-delay="100">
-                    {t('hand_workers.title')}
-                  </h1>
-                  <p className="hand-workers-subtitle" data-aos="fade-up" data-aos-delay="200">
-                    {t('hand_workers.subtitle')}
-                  </p>
-                  <div className="hand-workers-actions" data-aos="fade-up" data-aos-delay="300">
-                    <Link 
-                      to="/hand-workers/register"
-                      className="register-button"
-                    >
-                      <i className="fas fa-user-plus"></i>
-                      {t('hand_workers.register_as_worker')}
-                    </Link>
-                  </div>
-                </div>
-              </div>
+      {/* Header - Always visible, not dependent on loading state */}
+      <div 
+        className="hand-workers-header"
+        style={{
+          display: 'block',
+          visibility: 'visible',
+          opacity: 1,
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div 
+          className="hand-workers-title-section"
+          style={{
+            display: 'block',
+            visibility: 'visible',
+            opacity: 1,
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
+          }}
+        >
+          <h1 
+            className="hand-workers-title" 
+            data-aos="fade-up" 
+            data-aos-delay="100"
+            style={{
+              display: 'block',
+              visibility: 'visible',
+              opacity: 1,
+              animation: 'none',
+              transform: 'none'
+            }}
+          >
+            {t('hand_workers.title')}
+          </h1>
+          <p 
+            className="hand-workers-subtitle" 
+            data-aos="fade-up" 
+            data-aos-delay="200"
+            style={{
+              display: 'block',
+              visibility: 'visible',
+              opacity: 1,
+              animation: 'none',
+              transform: 'none'
+            }}
+          >
+            {t('hand_workers.subtitle')}
+          </p>
+          <div 
+            className="hand-workers-actions" 
+            data-aos="fade-up" 
+            data-aos-delay="300"
+            style={{
+              display: 'flex',
+              visibility: 'visible',
+              opacity: 1,
+              animation: 'none',
+              transform: 'none'
+            }}
+          >
+            <Link 
+              to="/hand-workers/register"
+              className="register-button"
+              style={{
+                display: 'inline-flex',
+                visibility: 'visible',
+                opacity: 1
+              }}
+            >
+              <i className="fas fa-user-plus"></i>
+              {t('hand_workers.register_as_worker')}
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="error-state" style={{
+          color: 'red',
+          textAlign: 'center',
+          margin: '20px 0',
+          padding: '12px',
+          background: '#fee2e2',
+          borderRadius: '8px'
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* Loading state - only show when loading and no categories yet */}
+      {loading && categories.length === 0 && !error && (
+        <div className="loading-state" style={{textAlign: 'center', margin: '40px 0'}}>
+          <div style={{
+            display: 'inline-block',
+            width: '40px',
+            height: '40px',
+            border: '4px solid #f3f4f6',
+            borderTop: '4px solid #667eea',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            marginBottom: '16px'
+          }}></div>
+          <p style={{color: '#64748b', fontSize: '0.95rem'}}>{t('hand_workers.loading')}</p>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* Empty state - no categories and not loading */}
+      {!loading && !selectedCategory && categories.length === 0 && !error && (
+        <div style={{textAlign: 'center', margin: '40px 0', color: '#64748b'}}>
+          <p>{t('hand_workers.no_categories_available') || 'No categories available'}</p>
+        </div>
+      )}
 
       <div className="hand-workers-content">
-        {!selectedCategory ? (
-          <div className="categories-section">
-            <h2 className="section-title" data-aos="fade-up" data-aos-delay="300">
+        {!selectedCategory && categories.length > 0 && (
+          <div 
+            className="categories-section"
+            style={{
+              display: 'block',
+              visibility: 'visible',
+              opacity: 1,
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box'
+            }}
+          >
+            <h2 
+              className="section-title" 
+              data-aos="fade-up" 
+              data-aos-delay="300"
+              style={{
+                display: 'block',
+                visibility: 'visible',
+                opacity: 1
+              }}
+            >
               {t('hand_workers.choose_category')}
             </h2>
-            <div className="categories-grid">
+            <div 
+              className="categories-grid"
+              style={{
+                display: 'grid',
+                visibility: 'visible',
+                opacity: 1,
+                width: '100%',
+                maxWidth: '100%',
+                boxSizing: 'border-box'
+              }}
+              key={`categories-grid-${categories.length}`}
+            >
               {categories.map((category, index) => {
+                if (!category || !category.id) {
+                  console.warn('[HandWorkers] Invalid category at index:', index, category);
+                  return null;
+                }
                 const localized = {
                   ...category,
                   name: getLocalizedValue(category, 'name'),
@@ -181,7 +411,7 @@ export default function HandWorkers() {
                 };
                 return (
                   <CategoryCard
-                    key={category.id}
+                    key={category.id || `category-${index}`}
                     category={localized}
                     onClick={handleCategorySelect}
                     index={index}
@@ -190,7 +420,9 @@ export default function HandWorkers() {
               })}
             </div>
           </div>
-        ) : (
+        )}
+
+        {selectedCategory && (
           <div className="category-details-section">
             <div className="category-header">
               <button 

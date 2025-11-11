@@ -55,6 +55,35 @@
   }
 }
 
+/* Ensure Hand Workers page header is always visible immediately */
+.page-transition:has(.hand-workers-page) .hand-workers-header,
+.page-transition > .hand-workers-page .hand-workers-header {
+  animation: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+.page-transition:has(.hand-workers-page) .hand-workers-title-section,
+.page-transition > .hand-workers-page .hand-workers-title-section {
+  animation: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+.page-transition:has(.hand-workers-page) .hand-workers-title-section h1,
+.page-transition > .hand-workers-page .hand-workers-title-section h1,
+.page-transition:has(.hand-workers-page) .hand-workers-subtitle,
+.page-transition > .hand-workers-page .hand-workers-subtitle,
+.page-transition:has(.hand-workers-page) .hand-workers-actions,
+.page-transition > .hand-workers-page .hand-workers-actions {
+  animation: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
 /* Enhanced Button Animations */
 .home-primary-button,
 .gallery-link-button,
