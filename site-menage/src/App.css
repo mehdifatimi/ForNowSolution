@@ -33,6 +33,12 @@
     padding-top: 0 !important;
   }
   
+  /* تقليل padding-top لصفحة Services في الموبايل - مسافة صغيرة فقط */
+  .page-transition:has(.services-page),
+  .page-transition > .services-page {
+    padding-top: 0.5rem !important;
+  }
+  
   .admin-page {
     padding-top: 0 !important;
   }
