@@ -637,6 +637,38 @@ export async function updateReservationStatus(token, id, status) {
 // RATINGS
 // ============================================
 
+// Helper function to calculate stats from ratings array
+function calculateRatingStats(ratings) {
+  if (!ratings || ratings.length === 0) {
+    return {
+      total_ratings: 0,
+      average_rating: 0,
+      recent_comments: []
+    };
+  }
+
+  const totalRatings = ratings.length;
+  const sum = ratings.reduce((acc, r) => acc + (r.rating || 0), 0);
+  const averageRating = totalRatings > 0 ? sum / totalRatings : 0;
+  
+  // Get recent comments (ratings with comments, sorted by date)
+  const recentComments = ratings
+    .filter(r => r.comment && r.comment.trim())
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 10)
+    .map(r => ({
+      rating: r.rating,
+      comment: r.comment,
+      created_at: r.created_at
+    }));
+
+  return {
+    total_ratings: totalRatings,
+    average_rating: averageRating,
+    recent_comments: recentComments
+  };
+}
+
 export async function getRatings() {
   try {
     const { data, error } = await supabase
@@ -645,7 +677,13 @@ export async function getRatings() {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+    
+    // Calculate stats and return in expected format
+    const stats = calculateRatingStats(data);
+    return {
+      success: true,
+      data: stats
+    };
   } catch (error) {
     handleApiError(error);
     throw error;
@@ -671,11 +709,21 @@ export async function submitRating(ratingData) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     
-    // Get user IP (client-side approximation)
-    const userIp = await fetch('https://api.ipify.org?format=json')
-      .then(res => res.json())
-      .then(data => data.ip)
-      .catch(() => 'unknown');
+    // Get user IP (non-blocking, with timeout)
+    let userIp = 'unknown';
+    try {
+      const ipResponse = await Promise.race([
+        fetch('https://api.ipify.org?format=json'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+      ]);
+      if (ipResponse.ok) {
+        const ipData = await ipResponse.json();
+        userIp = ipData.ip || 'unknown';
+      }
+    } catch (ipError) {
+      // IP fetch failed, continue with 'unknown'
+      console.warn('Could not fetch user IP:', ipError);
+    }
 
     const { data, error } = await supabase
       .from('ratings')
@@ -688,10 +736,41 @@ export async function submitRating(ratingData) {
       .select()
       .single();
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      // Handle duplicate rating error - return error object instead of throwing
+      if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+        return {
+          success: false,
+          message: 'Vous avez déjà soumis une évaluation.'
+        };
+      }
+      // For other database errors, throw to be caught by outer catch
+      throw error;
+    }
+
+    // Fetch all ratings to calculate updated stats
+    const { data: allRatings, error: statsError } = await supabase
+      .from('ratings')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (statsError) {
+      console.warn('Could not fetch stats after rating submission:', statsError);
+    }
+
+    // Calculate stats
+    const stats = calculateRatingStats(allRatings || []);
+
+    // Return in expected format
+    return {
+      success: true,
+      data: {
+        stats: stats
+      }
+    };
   } catch (error) {
     handleApiError(error);
+    // Re-throw to be handled by component's catch block
     throw error;
   }
 }

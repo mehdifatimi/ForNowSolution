@@ -374,16 +374,71 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
 
 /* Responsive Design */
 @media (max-width: 992px) {
-  .category-buttons-container {
+  .category-buttons-container,
+  .service-buttons-container {
     bottom: 50px;
     gap: 10px;
     padding: 10px 16px;
+    max-width: calc(100% - 32px);
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-auto-rows: auto;
+    justify-items: center;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+  }
+  
+  /* First 3 buttons in first row - each spans 2 columns */
+  .category-button:nth-child(1) {
+    grid-column: 1 / 3;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .category-button:nth-child(2) {
+    grid-column: 3 / 5;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .category-button:nth-child(3) {
+    grid-column: 5 / 7;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Next 2 buttons in second row - centered in the middle (columns 2-3 and 4-5) */
+  .category-button:nth-child(4) {
+    grid-column: 2 / 4;
+    width: 100%;
+    max-width: 100%;
+    justify-self: center;
+  }
+  
+  .category-button:nth-child(5) {
+    grid-column: 4 / 6;
+    width: 100%;
+    max-width: 100%;
+    justify-self: center;
+  }
+  
+  /* If there are more than 5 buttons, continue in grid */
+  .category-button:nth-child(n+6) {
+    width: 100%;
+    max-width: 100%;
   }
   
   .category-button {
     padding: 10px 18px;
     font-size: 12px;
     min-height: 42px;
+    border-radius: 24px;
+    white-space: nowrap;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
   }
   
   .button-container {
@@ -415,10 +470,11 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     max-width: calc(100% - 24px);
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     grid-auto-rows: auto;
     justify-items: center;
     align-items: center;
+    justify-content: center;
     overflow: visible;
     -webkit-overflow-scrolling: touch;
   }
@@ -433,24 +489,35 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     -ms-overflow-style: none;
   }
   
-  /* First 3 buttons in first row - take full width of their grid cell */
-  .category-button:nth-child(1),
-  .category-button:nth-child(2),
-  .category-button:nth-child(3) {
+  /* First 3 buttons in first row - each spans 2 columns */
+  .category-button:nth-child(1) {
+    grid-column: 1 / 3;
     width: 100%;
     max-width: 100%;
   }
   
-  /* Next 2 buttons in second row - positioned in columns 2 and 3 to center them */
+  .category-button:nth-child(2) {
+    grid-column: 3 / 5;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .category-button:nth-child(3) {
+    grid-column: 5 / 7;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Next 2 buttons in second row - centered in the middle (columns 2-3 and 4-5) */
   .category-button:nth-child(4) {
-    grid-column: 2 / 3;
+    grid-column: 2 / 4;
     width: 100%;
     max-width: 100%;
     justify-self: center;
   }
   
   .category-button:nth-child(5) {
-    grid-column: 3 / 4;
+    grid-column: 4 / 6;
     width: 100%;
     max-width: 100%;
     justify-self: center;
@@ -539,10 +606,11 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     max-width: calc(100% - 20px);
     width: 100%;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     grid-auto-rows: auto;
     justify-items: center;
     align-items: center;
+    justify-content: center;
     overflow: visible;
     -webkit-overflow-scrolling: touch;
   }
@@ -557,24 +625,35 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     -ms-overflow-style: none;
   }
   
-  /* First 3 buttons in first row */
-  .category-button:nth-child(1),
-  .category-button:nth-child(2),
-  .category-button:nth-child(3) {
+  /* First 3 buttons in first row - each spans 2 columns */
+  .category-button:nth-child(1) {
+    grid-column: 1 / 3;
     width: 100%;
     max-width: 100%;
   }
   
-  /* Next 2 buttons in second row - positioned in columns 2 and 3 to center them */
+  .category-button:nth-child(2) {
+    grid-column: 3 / 5;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .category-button:nth-child(3) {
+    grid-column: 5 / 7;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Next 2 buttons in second row - centered in the middle (columns 2-3 and 4-5) */
   .category-button:nth-child(4) {
-    grid-column: 2 / 3;
+    grid-column: 2 / 4;
     width: 100%;
     max-width: 100%;
     justify-self: center;
   }
   
   .category-button:nth-child(5) {
-    grid-column: 3 / 4;
+    grid-column: 4 / 6;
     width: 100%;
     max-width: 100%;
     justify-self: center;
