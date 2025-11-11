@@ -707,8 +707,12 @@ export default function Booking() {
     if (form.email && form.email.value.trim()) payload.email = form.email.value.trim();
     if (form.size && form.size.value.trim()) payload.size = form.size.value.trim();
     if (calculatedPrice > 0) payload.total_price = calculatedPrice;
+    // Store selected_types in admin_notes as JSON if needed for reference
     if (selectedTypes.length > 0) {
-      payload.selected_types = selectedTypes.map(t => ({ id: t.id, name: t.name, category: t.category }));
+      const selectedTypesInfo = selectedTypes.map(t => ({ id: t.id, name: t.name, category: t.category }));
+      payload.admin_notes = (payload.admin_notes || '') + 
+        (payload.admin_notes ? '\n\n' : '') + 
+        `Selected Types: ${JSON.stringify(selectedTypesInfo)}`;
     }
     
     try {
