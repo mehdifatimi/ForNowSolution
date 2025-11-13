@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '../lib/supabase';
 import './OrderSummary.css';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
 
 export default function OrderSummary() {
   const { t } = useTranslation();
@@ -20,7 +19,7 @@ export default function OrderSummary() {
     return Number.isFinite(n) ? n : 0;
   };
 
-  // Charger les détails d'un produit depuis l'API
+  // Charger les détails d'un produit depuis Supabase
   const fetchProductDetails = async (productId) => {
     // Si déjà en cache, retourner directement
     if (productsCache[productId]) {
@@ -28,22 +27,24 @@ export default function OrderSummary() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/products`, {
-        headers: { 'Accept': 'application/json' }
-      });
+      console.log('[OrderSummary] Fetching product details for:', productId);
+      const { data: product, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', parseInt(productId))
+        .single();
       
-      if (response.ok) {
-        const data = await response.json();
-        const products = Array.isArray(data) ? data : data.data || [];
-        const product = products.find(p => p.id === parseInt(productId));
-        
-        if (product) {
-          setProductsCache(prev => ({ ...prev, [productId]: product }));
-          return product;
-        }
+      if (error) {
+        console.error('[OrderSummary] Error fetching product:', error);
+        return null;
+      }
+      
+      if (product) {
+        setProductsCache(prev => ({ ...prev, [productId]: product }));
+        return product;
       }
     } catch (error) {
-      console.error('Error fetching product details:', error);
+      console.error('[OrderSummary] Exception fetching product details:', error);
     }
     
     return null;
@@ -59,7 +60,7 @@ export default function OrderSummary() {
         return;
       }
 
-      // Charger les détails des produits depuis l'API
+      // Charger les détails des produits depuis Supabase
       const itemsWithDetails = await Promise.all(
         cart.map(async (item) => {
           const product = await fetchProductDetails(item.product_id);
@@ -84,7 +85,24 @@ export default function OrderSummary() {
         })
       );
 
-      setItems(itemsWithDetails);
+      // Filter out deleted products (products that don't exist or have no price)
+      const validItems = itemsWithDetails.filter(item => 
+        item.product && 
+        item.product.name !== t('order_summary.product_deleted') && 
+        item.price > 0
+      );
+
+      setItems(validItems);
+      
+      // Update localStorage to remove deleted products
+      if (validItems.length !== itemsWithDetails.length) {
+        const updatedCart = validItems.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          added_at: item.id.split('_')[2] || Date.now()
+        }));
+        localStorage.setItem(cartKey, JSON.stringify(updatedCart));
+      }
     } catch (error) {
       console.error('Error loading guest cart:', error);
       setItems([]);
@@ -96,31 +114,48 @@ export default function OrderSummary() {
       setLoading(true);
       setError(null);
       
-      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      // Check Supabase Auth session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (token) {
-        // Utilisateur connecté: charger depuis l'API
-        const res = await fetch(`${API_BASE_URL}/api/cart`, {
-          headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-        });
+      if (session && !sessionError) {
+        // Utilisateur connecté: charger depuis Supabase
+        console.log('[OrderSummary] Loading cart for authenticated user:', session.user.id);
         
-        if (res.ok) {
-          const data = await res.json();
-          setItems(data.data?.items || []);
-        } else if (res.status === 401) {
-          // Token invalide, utiliser localStorage
-          localStorage.removeItem('auth_token');
-          sessionStorage.removeItem('auth_token');
-          await loadGuestCart();
-        } else {
+        const { data: cartData, error: cartError } = await supabase
+          .from('carts')
+          .select(`
+            *,
+            products (*)
+          `)
+          .eq('user_id', session.user.id);
+        
+        if (cartError) {
+          console.error('[OrderSummary] Error loading cart:', cartError);
           throw new Error('Erreur lors du chargement du panier');
         }
+        
+        // Transform cart data to match expected format
+        const cartItems = (cartData || []).map(item => ({
+          id: item.id,
+          product_id: item.product_id,
+          quantity: item.quantity || 1,
+          price: item.products?.price || 0,
+          product: item.products ? {
+            id: item.products.id,
+            name: item.products.name || item.products.name_fr || item.products.name_en || item.products.name_ar || t('order_summary.product_deleted'),
+            description: item.products.description || item.products.description_fr || item.products.description_en || item.products.description_ar || '',
+            image: item.products.image || null
+          } : null
+        })).filter(item => item.product && item.price > 0); // Filter out deleted/zero-price products
+        
+        setItems(cartItems);
       } else {
         // Utilisateur non connecté: charger depuis localStorage
+        console.log('[OrderSummary] Loading guest cart from localStorage');
         await loadGuestCart();
       }
     } catch (e) {
-      console.error('Error loading cart:', e);
+      console.error('[OrderSummary] Error loading cart:', e);
       setError(e.message || 'Erreur lors du chargement du panier');
       // Essayer de charger depuis localStorage en cas d'erreur
       await loadGuestCart();
@@ -147,42 +182,49 @@ export default function OrderSummary() {
   const applyPromoCode = async () => {
     if (!promoCode.trim()) return;
     
-    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
-    
     setApplyingPromo(true);
     try {
-      // Note: Les codes promo peuvent nécessiter une authentification selon votre backend
-      // Pour l'instant, on permet l'application même sans token
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
+      // Calculate current total
+      const currentTotal = items.reduce((t, it) => t + toNumber(it.quantity) * toNumber(it.price), 0);
       
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      // Check Supabase Auth session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Fetch promo code from Supabase
+      const { data: promoData, error: promoError } = await supabase
+        .from('promotions')
+        .select('*')
+        .eq('code', promoCode.trim().toUpperCase())
+        .eq('is_active', true)
+        .single();
+      
+      if (promoError || !promoData) {
+        alert('Code promo invalide');
+        return;
       }
       
-      const response = await fetch(`${API_BASE_URL}/api/apply-promo`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify({ code: promoCode.trim() })
+      // Check if promo is still valid
+      const now = new Date();
+      const startDate = promoData.start_date ? new Date(promoData.start_date) : null;
+      const endDate = promoData.end_date ? new Date(promoData.end_date) : null;
+      
+      if (startDate && now < startDate) {
+        alert('Ce code promo n\'est pas encore valide');
+        return;
+      }
+      
+      if (endDate && now > endDate) {
+        alert('Ce code promo a expiré');
+        return;
+      }
+      
+      setPromoApplied({
+        code: promoCode.trim().toUpperCase(),
+        discount: toNumber(promoData.discount) || 0,
+        message: 'Code promo appliqué'
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setPromoApplied({
-            code: promoCode.trim(),
-            discount: data.discount,
-            message: data.message
-          });
-        } else {
-          alert(data.message || 'Code promo invalide');
-        }
-      } else {
-        alert('Erreur lors de l\'application du code promo');
-      }
     } catch (e) {
+      console.error('[OrderSummary] Error applying promo code:', e);
       alert('Erreur lors de l\'application du code promo');
     } finally {
       setApplyingPromo(false);
