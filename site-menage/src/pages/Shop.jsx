@@ -166,28 +166,53 @@ const getProductImageUrl = (product) => {
 // Component for product image with error handling
 const ProductImage = ({ product }) => {
   const { t } = useTranslation();
-  const imageUrl = getProductImageUrl(product);
-  const defaultImages = [
+  
+  // Memoize image URL and default image to prevent unnecessary recalculations
+  const imageUrl = React.useMemo(() => getProductImageUrl(product), [product.id, product.image]);
+  
+  const defaultImages = React.useMemo(() => [
     '/produitNettoyage.jpg',
     '/nettoyage1.jpg',
     '/nettoyage2.jpg',
     '/nettoyage3.jpg',
     '/canaper.jpg'
-  ];
-  const defaultImageIndex = (product.id || 0) % defaultImages.length;
-  const defaultImage = defaultImages[defaultImageIndex];
+  ], []);
   
-  const [imgSrc, setImgSrc] = useState(imageUrl || defaultImage);
+  const defaultImage = React.useMemo(() => {
+    const defaultImageIndex = (product.id || 0) % defaultImages.length;
+    return defaultImages[defaultImageIndex];
+  }, [product.id, defaultImages]);
+  
+  // Initialize with the final image URL once
+  const initialImageSrc = React.useMemo(() => imageUrl || defaultImage, [imageUrl, defaultImage]);
+  
+  const [imgSrc, setImgSrc] = useState(initialImageSrc);
   const [attemptCount, setAttemptCount] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const imgRef = useRef(null);
   
-  // Reset when product changes
+  // Only reset when product ID actually changes (not on every render)
   useEffect(() => {
-    setImgSrc(imageUrl || defaultImage);
-    setAttemptCount(0);
-  }, [product.id, imageUrl, defaultImage]);
+    const newImageUrl = getProductImageUrl(product);
+    const newDefaultImage = defaultImages[(product.id || 0) % defaultImages.length];
+    const newInitialSrc = newImageUrl || newDefaultImage;
+    
+    // Only update if the source actually changed
+    if (newInitialSrc !== imgSrc) {
+      setImgSrc(newInitialSrc);
+      setAttemptCount(0);
+      setImageLoaded(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id]); // Only depend on product.id, not on computed values
   
-  const handleImageError = (ev) => {
+  const handleImageError = React.useCallback((ev) => {
+    // Prevent multiple error handlers from firing
+    if (ev.currentTarget.dataset.errorHandled === 'true') {
+      return;
+    }
+    ev.currentTarget.dataset.errorHandled = 'true';
+    
     console.warn('[Shop] Image load error:', {
       currentSrc: ev.currentTarget.src,
       originalUrl: imageUrl,
@@ -198,8 +223,15 @@ const ProductImage = ({ product }) => {
     // Try default images if original failed
     if (attemptCount < defaultImages.length - 1) {
       const nextIndex = (attemptCount + 1) % defaultImages.length;
-      setImgSrc(defaultImages[nextIndex]);
+      const nextImage = defaultImages[nextIndex];
+      setImgSrc(nextImage);
       setAttemptCount(prev => prev + 1);
+      // Reset error flag for next attempt
+      setTimeout(() => {
+        if (imgRef.current) {
+          imgRef.current.dataset.errorHandled = 'false';
+        }
+      }, 100);
     } else {
       // All images failed, show placeholder
       ev.currentTarget.style.display = 'none';
@@ -208,7 +240,21 @@ const ProductImage = ({ product }) => {
         placeholder.style.display = 'flex';
       }
     }
-  };
+  }, [attemptCount, defaultImages, imageUrl, product.id]);
+  
+  const handleImageLoad = React.useCallback(() => {
+    setImageLoaded(true);
+    // Ensure image stays visible
+    if (imgRef.current) {
+      imgRef.current.style.display = 'block';
+      imgRef.current.style.opacity = '1';
+      imgRef.current.style.visibility = 'visible';
+    }
+    console.log('[Shop] ✅ Image loaded successfully:', {
+      src: imgSrc,
+      productId: product.id
+    });
+  }, [imgSrc, product.id]);
   
   if (!imageUrl && !defaultImage) {
     return (
@@ -224,15 +270,18 @@ const ProductImage = ({ product }) => {
     <>
       <img 
         ref={imgRef}
+        key={`product-image-${product.id}-${imgSrc}`}
         src={imgSrc} 
-        alt={product.name}
+        alt={product.name || 'Product'}
         className="product-image"
+        loading="lazy"
+        decoding="async"
         onError={handleImageError}
-        onLoad={() => {
-          console.log('[Shop] ✅ Image loaded successfully:', {
-            src: imgSrc,
-            productId: product.id
-          });
+        onLoad={handleImageLoad}
+        style={{
+          display: 'block',
+          opacity: 1,
+          visibility: 'visible'
         }}
       />
     </>

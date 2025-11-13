@@ -71,8 +71,10 @@ export default function TousLesServices() {
               }}
             >
               <div className="card-background-overlay"></div>
-              <h2 className="service-name">{t(`tous_les_services.${service.translationKey}.name`)}</h2>
-              <p className="service-name-fr">{t(`tous_les_services.${service.translationKey}.name_fr`)}</p>
+              <div className="service-card-content">
+                <h2 className="service-name">{t(`tous_les_services.${service.translationKey}.name`)}</h2>
+                <p className="service-name-fr">{t(`tous_les_services.${service.translationKey}.name_fr`)}</p>
+              </div>
               <div className="card-overlay"></div>
             </div>
           ))}

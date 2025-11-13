@@ -41,7 +41,7 @@
   background-position: center;
   background-repeat: no-repeat;
   border-radius: 24px;
-  padding: 2.5rem 2rem;
+  padding: 0;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -54,6 +54,7 @@
   text-align: center;
   min-height: 300px;
   justify-content: center;
+  height: 100%;
 }
 
 /* Icon Container */
@@ -77,6 +78,25 @@
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Service Card Content Container */
+.service-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: 2.5rem 2rem;
+  box-sizing: border-box;
+}
+
 /* Service Name */
 .service-name {
   font-size: 1.75rem;
@@ -84,8 +104,9 @@
   color: #0f172a;
   margin: 0 0 0.5rem 0;
   transition: color 0.3s ease;
-  position: relative;
-  z-index: 3;
+  text-align: center;
+  width: 100%;
+  line-height: 1.2;
 }
 
 .service-name-fr {
@@ -94,8 +115,9 @@
   color: #64748b;
   margin: 0;
   transition: color 0.3s ease;
-  position: relative;
-  z-index: 3;
+  text-align: center;
+  width: 100%;
+  line-height: 1.4;
 }
 
 /* Card Background Overlay */
@@ -225,6 +247,16 @@
 
   .service-card {
     min-height: 250px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    height: 100%;
+  }
+
+  .service-card-content {
     padding: 2rem 1.5rem;
   }
 
@@ -238,12 +270,27 @@
     font-size: 2.5rem;
   }
 
+  .service-card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+  }
+
   .service-name {
     font-size: 1.5rem;
+    text-align: center;
+    width: 100%;
+    line-height: 1.2;
   }
 
   .service-name-fr {
     font-size: 1rem;
+    text-align: center;
+    width: 100%;
+    line-height: 1.4;
   }
 }
 
@@ -259,6 +306,16 @@
 
   .service-card {
     min-height: 220px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    height: 100%;
+  }
+
+  .service-card-content {
     padding: 1.5rem 1rem;
   }
 
@@ -271,12 +328,27 @@
     font-size: 2rem;
   }
 
+  .service-card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+  }
+
   .service-name {
     font-size: 1.25rem;
+    text-align: center;
+    width: 100%;
+    line-height: 1.2;
   }
 
   .service-name-fr {
     font-size: 0.9rem;
+    text-align: center;
+    width: 100%;
+    line-height: 1.4;
   }
 }
 
