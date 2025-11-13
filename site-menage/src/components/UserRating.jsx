@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getRatings, getAllRatings, submitRating } from '../api-supabase';
+import { getRatings, getAllRatings, submitRating, hasUserRatedSite } from '../api-supabase';
 import './UserRating.css';
 
 export default function UserRating() {
@@ -9,6 +9,9 @@ export default function UserRating() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hasRated, setHasRated] = useState(false);
+  const [userRating, setUserRating] = useState(null);
+  const [checkingRating, setCheckingRating] = useState(true);
   const [stats, setStats] = useState({
     total_ratings: 0,
     average_rating: 0,
@@ -20,7 +23,21 @@ export default function UserRating() {
 
   useEffect(() => {
     loadStats();
+    checkUserRating();
   }, []);
+
+  const checkUserRating = async () => {
+    try {
+      setCheckingRating(true);
+      const result = await hasUserRatedSite();
+      setHasRated(result.hasRated);
+      setUserRating(result.rating);
+    } catch (e) {
+      console.error('Error checking user rating:', e);
+    } finally {
+      setCheckingRating(false);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -76,9 +93,13 @@ export default function UserRating() {
 
       if (response.success) {
         setSubmitted(true);
+        setHasRated(true);
         setStats(response.data.stats);
         setRating(0);
         setComment('');
+        
+        // Reload user rating to get the new rating data
+        await checkUserRating();
         
         // Reset submitted state after 3 seconds
         setTimeout(() => {
@@ -86,6 +107,10 @@ export default function UserRating() {
         }, 3000);
       } else {
         setError(response.message || 'Erreur lors de l\'envoi');
+        // If error is about already rated, update hasRated state
+        if (response.message?.includes('déjà soumis')) {
+          await checkUserRating();
+        }
       }
     } catch (e) {
       console.error('Error submitting rating:', e);
@@ -202,7 +227,37 @@ export default function UserRating() {
           </div>
         </div>
 
-        {submitted ? (
+        {checkingRating ? (
+          <div className="rating-loading">
+            <div className="loading-spinner"></div>
+            <p>Vérification en cours...</p>
+          </div>
+        ) : hasRated ? (
+          <div className="rating-already-submitted">
+            <div className="already-rated-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="#fbbf24" stroke="#f59e0b" strokeWidth="2"/>
+              </svg>
+            </div>
+            <h3>Vous avez déjà évalué notre site</h3>
+            {userRating && (
+              <div className="user-rating-display">
+                <div className="user-rating-stars">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className={i < userRating.rating ? 'filled' : ''}>★</span>
+                  ))}
+                </div>
+                {userRating.comment && (
+                  <p className="user-rating-comment">"{userRating.comment}"</p>
+                )}
+                <small className="user-rating-date">
+                  Évalué le {new Date(userRating.created_at).toLocaleDateString('fr-FR')}
+                </small>
+              </div>
+            )}
+            <p className="already-rated-message">Merci pour votre évaluation ! Vous ne pouvez évaluer qu'une seule fois.</p>
+          </div>
+        ) : submitted ? (
           <div className="rating-success">
             <div className="success-icon">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

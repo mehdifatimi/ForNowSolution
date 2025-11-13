@@ -834,9 +834,11 @@ function calculateRatingStats(ratings) {
 
 export async function getRatings() {
   try {
+    // Only get site ratings (where product_id is NULL)
     const { data, error } = await supabase
       .from('ratings')
       .select('*')
+      .is('product_id', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -855,9 +857,11 @@ export async function getRatings() {
 
 export async function getAllRatings() {
   try {
+    // Only get site ratings (where product_id is NULL)
     const { data, error } = await supabase
       .from('ratings')
       .select('*')
+      .is('product_id', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -868,9 +872,63 @@ export async function getAllRatings() {
   }
 }
 
+/**
+ * Check if the current user has already rated the site
+ * (ratings where product_id is NULL are site ratings)
+ */
+export async function hasUserRatedSite() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { hasRated: false, rating: null };
+    }
+
+    const { data, error } = await supabase
+      .from('ratings')
+      .select('*')
+      .eq('user_id', user.id)
+      .is('product_id', null)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      throw error;
+    }
+
+    return {
+      hasRated: !!data,
+      rating: data || null
+    };
+  } catch (error) {
+    handleApiError(error);
+    throw error;
+  }
+}
+
 export async function submitRating(ratingData) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
+    
+    // Check if user has already rated the site (for site ratings, product_id should be null)
+    if (user && !ratingData.product_id) {
+      const { data: existingRating, error: checkError } = await supabase
+        .from('ratings')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('product_id', null)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+
+      if (existingRating) {
+        return {
+          success: false,
+          message: 'Vous avez déjà soumis une évaluation. Vous ne pouvez évaluer qu\'une seule fois.'
+        };
+      }
+    }
     
     // Get user IP (non-blocking, with timeout)
     let userIp = 'unknown';
@@ -895,6 +953,7 @@ export async function submitRating(ratingData) {
         user_id: user?.id || null,
         user_ip: userIp,
         user_agent: navigator.userAgent,
+        product_id: ratingData.product_id || null, // Ensure product_id is null for site ratings
       }])
       .select()
       .single();
@@ -904,17 +963,18 @@ export async function submitRating(ratingData) {
       if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
         return {
           success: false,
-          message: 'Vous avez déjà soumis une évaluation.'
+          message: 'Vous avez déjà soumis une évaluation. Vous ne pouvez évaluer qu\'une seule fois.'
         };
       }
       // For other database errors, throw to be caught by outer catch
       throw error;
     }
 
-    // Fetch all ratings to calculate updated stats
+    // Fetch all site ratings to calculate updated stats (only where product_id is NULL)
     const { data: allRatings, error: statsError } = await supabase
       .from('ratings')
       .select('*')
+      .is('product_id', null)
       .order('created_at', { ascending: false });
 
     if (statsError) {
