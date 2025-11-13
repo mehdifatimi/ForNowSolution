@@ -7,10 +7,12 @@ export default function AdminServicesCrud({ token }) {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [iconSearch, setIconSearch] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({ 
     icon: '', 
     title: '', 
@@ -50,10 +52,13 @@ export default function AdminServicesCrud({ token }) {
   const loadServices = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await getServicesAdmin(token);
       setServices(Array.isArray(data) ? data : data.data || []);
     } catch (e) {
-      setError('Impossible de charger les services');
+      console.error('Error loading services:', e);
+      setError('Impossible de charger les services: ' + (e.message || 'Erreur inconnue'));
+      setTimeout(() => setError(''), 5000);
     } finally {
       setLoading(false);
     }
@@ -61,18 +66,72 @@ export default function AdminServicesCrud({ token }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation
+    if (!formData.icon || formData.icon.trim() === '') {
+      setError('Veuillez sélectionner une icône');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    // At least one name field is required
+    if (!formData.name_fr && !formData.name_ar && !formData.name_en && !formData.title) {
+      setError('Veuillez entrer au moins un nom (FR, AR, EN ou titre)');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    setSuccessMessage('');
+
     try {
-      if (editingService) {
-        await updateServiceAdmin(token, editingService.id, formData);
-      } else {
-        await createServiceAdmin(token, formData);
+      // Prepare data - remove empty strings and null values
+      const cleanData = {
+        icon: formData.icon.trim(),
+        name_fr: formData.name_fr?.trim() || null,
+        name_ar: formData.name_ar?.trim() || null,
+        name_en: formData.name_en?.trim() || null,
+        description_fr: formData.description_fr?.trim() || null,
+        description_ar: formData.description_ar?.trim() || null,
+        description_en: formData.description_en?.trim() || null,
+        slug: formData.slug?.trim() || null,
+        is_active: formData.is_active !== false,
+        sort_order: parseInt(formData.sort_order) || 0,
+        order: parseInt(formData.order) || 0
+      };
+
+      // Add title and description as fallback if provided
+      if (formData.title?.trim()) {
+        cleanData.title = formData.title.trim();
       }
+      if (formData.description?.trim()) {
+        cleanData.description = formData.description.trim();
+      }
+
+      if (editingService) {
+        await updateServiceAdmin(token, editingService.id, cleanData);
+        setSuccessMessage('Service modifié avec succès!');
+      } else {
+        await createServiceAdmin(token, cleanData);
+        setSuccessMessage('Service créé avec succès!');
+      }
+      
       setShowForm(false);
       setEditingService(null);
       setFormData({ icon: '', title: '', description: '', name_ar:'', name_fr:'', name_en:'', description_ar:'', description_fr:'', description_en:'', slug:'', is_active: true, sort_order: 0, order: 0 });
-      loadServices();
+      
+      setTimeout(() => {
+        setSuccessMessage('');
+        loadServices();
+      }, 1000);
     } catch (e) {
-      setError(e.message || 'Erreur lors de la sauvegarde');
+      console.error('Error saving service:', e);
+      const errorMessage = e.message || e.error?.message || 'Erreur lors de la sauvegarde';
+      setError(errorMessage);
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -97,14 +156,47 @@ export default function AdminServicesCrud({ token }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce service ?')) {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce service ? Cette action est irréversible.')) {
       return;
     }
+    
+    setError('');
+    setSuccessMessage('');
+    
     try {
-      await deleteServiceAdmin(token, id);
-      loadServices();
+      console.log('Deleting service with ID:', id);
+      const result = await deleteServiceAdmin(token, id);
+      
+      if (result && result.deleted) {
+        // Remove from local state immediately for better UX
+        setServices(prevServices => prevServices.filter(service => service.id !== id));
+        
+        // Show appropriate message based on deletion type
+        if (result.softDeleted) {
+          setSuccessMessage('Service désactivé avec succès! (Note: Vérifiez les permissions RLS pour la suppression complète)');
+        } else {
+          setSuccessMessage('Service supprimé avec succès!');
+        }
+        
+        // Reload services to ensure sync with database
+        setTimeout(() => {
+          setSuccessMessage('');
+          loadServices();
+        }, 2000);
+      } else {
+        // If deletion didn't confirm, reload to check
+        loadServices();
+        setError('Impossible de confirmer la suppression. Actualisation de la liste...');
+        setTimeout(() => setError(''), 3000);
+      }
     } catch (e) {
-      setError(e.message || 'Erreur lors de la suppression');
+      console.error('Error deleting service:', e);
+      const errorMessage = e.message || e.error?.message || 'Erreur lors de la suppression';
+      setError(errorMessage);
+      setTimeout(() => setError(''), 5000);
+      
+      // Reload services even on error to ensure UI is in sync
+      loadServices();
     }
   };
 
@@ -127,19 +219,41 @@ export default function AdminServicesCrud({ token }) {
   );
 
   const toggleActive = async (service) => {
+    setError('');
+    setSuccessMessage('');
+    
     try {
-      await updateServiceAdmin(token, service.id, { ...service, is_active: !service.is_active });
-      loadServices();
+      const newStatus = !service.is_active;
+      await updateServiceAdmin(token, service.id, { is_active: newStatus });
+      setSuccessMessage(`Service ${newStatus ? 'activé' : 'désactivé'} avec succès!`);
+      setTimeout(() => {
+        setSuccessMessage('');
+        loadServices();
+      }, 1000);
     } catch (e) {
-      setError(e.message || 'Erreur lors de la modification');
+      console.error('Error toggling service status:', e);
+      const errorMessage = e.message || e.error?.message || 'Erreur lors de la modification';
+      setError(errorMessage);
+      setTimeout(() => setError(''), 5000);
     }
   };
 
   if (loading) return <div className="admin-services-loading">Chargement des services...</div>;
-  if (error) return <div className="admin-services-error">{error}</div>;
 
   return (
     <div className="admin-services-crud">
+      {error && (
+        <div className="admin-services-error" onClick={() => setError('')}>
+          {error}
+          <span className="admin-services-error-close">×</span>
+        </div>
+      )}
+      {successMessage && (
+        <div className="admin-services-success">
+          {successMessage}
+          <span className="admin-services-success-close" onClick={() => setSuccessMessage('')}>×</span>
+        </div>
+      )}
       <div className="admin-services-header">
         <h2 className="admin-services-title">Gestion des Services</h2>
         <button 
@@ -287,10 +401,19 @@ export default function AdminServicesCrud({ token }) {
               </div>
               
               <div className="admin-services-form-actions">
-                <button type="submit" className="admin-services-save-button">
-                  {editingService ? 'Modifier' : 'Créer'}
+                <button 
+                  type="submit" 
+                  className="admin-services-save-button"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Enregistrement...' : (editingService ? 'Modifier' : 'Créer')}
                 </button>
-                <button type="button" onClick={handleCancel} className="admin-services-cancel-button">
+                <button 
+                  type="button" 
+                  onClick={handleCancel} 
+                  className="admin-services-cancel-button"
+                  disabled={submitting}
+                >
                   Annuler
                 </button>
               </div>

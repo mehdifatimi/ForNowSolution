@@ -350,15 +350,24 @@ export async function getServicesAdmin(token) {
 
 export async function createServiceAdmin(token, serviceData) {
   try {
+    // Remove undefined values and ensure proper types
+    const cleanData = Object.fromEntries(
+      Object.entries(serviceData).filter(([_, v]) => v !== undefined)
+    );
+
     const { data, error } = await supabase
       .from('services')
-      .insert([serviceData])
+      .insert([cleanData])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error creating service:', error);
+      throw new Error(error.message || 'Erreur lors de la création du service');
+    }
     return data;
   } catch (error) {
+    console.error('Exception in createServiceAdmin:', error);
     handleApiError(error);
     throw error;
   }
@@ -366,16 +375,32 @@ export async function createServiceAdmin(token, serviceData) {
 
 export async function updateServiceAdmin(token, id, serviceData) {
   try {
+    if (!id) {
+      throw new Error('ID du service requis pour la mise à jour');
+    }
+
+    // Remove undefined values and ensure proper types
+    const cleanData = Object.fromEntries(
+      Object.entries(serviceData).filter(([_, v]) => v !== undefined)
+    );
+
+    // Add updated_at timestamp
+    cleanData.updated_at = new Date().toISOString();
+
     const { data, error } = await supabase
       .from('services')
-      .update(serviceData)
+      .update(cleanData)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating service:', error);
+      throw new Error(error.message || 'Erreur lors de la mise à jour du service');
+    }
     return data;
   } catch (error) {
+    console.error('Exception in updateServiceAdmin:', error);
     handleApiError(error);
     throw error;
   }
@@ -383,14 +408,152 @@ export async function updateServiceAdmin(token, id, serviceData) {
 
 export async function deleteServiceAdmin(token, id) {
   try {
-    const { error } = await supabase
+    if (!id) {
+      throw new Error('ID du service requis pour la suppression');
+    }
+
+    console.log('Attempting to delete service with ID:', id, 'Type:', typeof id);
+
+    // Ensure ID is a number
+    const serviceId = typeof id === 'string' ? parseInt(id, 10) : id;
+    if (isNaN(serviceId)) {
+      throw new Error('ID invalide');
+    }
+
+    // Check if we have a valid Supabase session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (!session && !token) {
+      console.warn('No Supabase session or token found');
+      // Try to use token if provided
+      if (token) {
+        console.log('Using provided token for authentication');
+      } else {
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+    }
+
+    // Try to delete the service directly
+    const { data: deletedData, error: deleteError } = await supabase
       .from('services')
       .delete()
-      .eq('id', id);
+      .eq('id', serviceId)
+      .select();
 
-    if (error) throw error;
-    return { message: 'Service deleted successfully' };
+    // If deletion succeeded (returned data)
+    if (deletedData && deletedData.length > 0) {
+      console.log('Service deleted successfully:', deletedData);
+      return { message: 'Service supprimé avec succès', deleted: true, data: deletedData };
+    }
+
+    // If there's an error, check if it's RLS-related or session-related
+    if (deleteError) {
+      console.error('Delete error:', deleteError);
+      console.error('Error code:', deleteError.code);
+      console.error('Error message:', deleteError.message);
+      console.error('Error details:', deleteError);
+      
+      // Check for 406 Not Acceptable (usually means no session or RLS issue)
+      if (deleteError.code === 'PGRST301' || deleteError.message?.includes('406') || deleteError.message?.includes('Not Acceptable')) {
+        console.log('406 error detected - likely RLS or session issue, attempting soft delete...');
+        
+        // Try soft delete: set is_active to false
+        const { data: softDeleteData, error: softDeleteError } = await supabase
+          .from('services')
+          .update({ is_active: false })
+          .eq('id', serviceId)
+          .select()
+          .single();
+
+        if (softDeleteError) {
+          console.error('Soft delete also failed:', softDeleteError);
+          throw new Error('Impossible de supprimer le service. Vérifiez que vous êtes connecté et que les permissions RLS sont correctes.');
+        }
+
+        if (softDeleteData) {
+          console.log('Service soft deleted (is_active = false)');
+          return { 
+            message: 'Service désactivé (soft delete) - Vérifiez les permissions RLS pour la suppression complète', 
+            deleted: true, 
+            softDeleted: true,
+            data: softDeleteData 
+          };
+        }
+      }
+      
+      // If RLS error, try soft delete as fallback
+      if (deleteError.code === '42501' || deleteError.message?.includes('permission') || deleteError.message?.includes('policy') || deleteError.message?.includes('row-level security')) {
+        console.log('RLS permission error detected, attempting soft delete...');
+        
+        // Try soft delete: set is_active to false
+        const { data: softDeleteData, error: softDeleteError } = await supabase
+          .from('services')
+          .update({ is_active: false })
+          .eq('id', serviceId)
+          .select()
+          .single();
+
+        if (softDeleteError) {
+          console.error('Soft delete also failed:', softDeleteError);
+          throw new Error('Impossible de supprimer le service. Vérifiez les permissions RLS dans Supabase.');
+        }
+
+        if (softDeleteData) {
+          console.log('Service soft deleted (is_active = false)');
+          return { 
+            message: 'Service désactivé (soft delete) - Vérifiez les permissions RLS pour la suppression complète', 
+            deleted: true, 
+            softDeleted: true,
+            data: softDeleteData 
+          };
+        }
+      }
+      
+      // For other errors, throw the original error
+      throw new Error(deleteError.message || 'Erreur lors de la suppression du service');
+    }
+
+    // If no error and no data returned, deletion might have succeeded silently
+    // Verify by checking if service still exists
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('services')
+      .select('id')
+      .eq('id', serviceId)
+      .maybeSingle();
+
+    // If service doesn't exist (PGRST116 = not found), deletion was successful
+    if (verifyError && verifyError.code === 'PGRST116') {
+      console.log('Service verified as deleted (not found after delete)');
+      return { message: 'Service supprimé avec succès', deleted: true };
+    }
+
+    // If service still exists and no error, deletion failed silently
+    if (verifyData) {
+      console.warn('Service still exists after delete - no error but service persists');
+      // Try soft delete as fallback
+      const { data: softDeleteData, error: softDeleteError } = await supabase
+        .from('services')
+        .update({ is_active: false })
+        .eq('id', serviceId)
+        .select()
+        .single();
+
+      if (!softDeleteError && softDeleteData) {
+        return { 
+          message: 'Service désactivé (soft delete) - La suppression complète nécessite des permissions RLS', 
+          deleted: true, 
+          softDeleted: true 
+        };
+      }
+      
+      throw new Error('La suppression a échoué. Le service existe toujours. Vérifiez les permissions RLS.');
+    }
+
+    // If no verifyData and no error, assume deletion succeeded
+    console.log('Service deleted successfully (no verification data)');
+    return { message: 'Service supprimé avec succès', deleted: true };
   } catch (error) {
+    console.error('Exception in deleteServiceAdmin:', error);
     handleApiError(error);
     throw error;
   }

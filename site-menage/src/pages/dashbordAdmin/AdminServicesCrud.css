@@ -405,9 +405,19 @@
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
-.admin-services-save-button:hover {
+.admin-services-save-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.admin-services-save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-services-cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .admin-services-cancel-button {
@@ -617,13 +627,73 @@
 
 .admin-services-error {
   text-align: center;
-  padding: 20px;
+  padding: 16px 20px;
   color: #dc2626;
   background: linear-gradient(135deg, #fef2f2, #fecaca);
   border: 1px solid #fecaca;
   border-radius: 12px;
   margin: 20px 0;
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
+  position: relative;
+  cursor: pointer;
+  animation: slideDown 0.3s ease;
+}
+
+.admin-services-error-close {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.admin-services-error-close:hover {
+  opacity: 1;
+}
+
+.admin-services-success {
+  text-align: center;
+  padding: 16px 20px;
+  color: #166534;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  margin: 20px 0;
+  box-shadow: 0 2px 8px rgba(22, 101, 52, 0.1);
+  position: relative;
+  cursor: pointer;
+  animation: slideDown 0.3s ease;
+}
+
+.admin-services-success-close {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.admin-services-success-close:hover {
+  opacity: 1;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .admin-services-empty {
