@@ -299,46 +299,60 @@ export default function AdminServicesCrud({ token }) {
         </div>
       )}
 
-      <div className="admin-services-grid">
-        {services.map((service) => (
-          <div key={service.id} className={`admin-services-card ${!service.is_active ? 'inactive' : ''}`}>
-            <div className="admin-services-card-header">
-              <span className="admin-services-icon" title={service.icon}>
-                {service.icon || '🏠'}
-              </span>
-              <div className="admin-services-actions">
-                <button 
-                  onClick={() => toggleActive(service)}
-                  className={`admin-services-toggle ${service.is_active ? 'active' : 'inactive'}`}
-                  title={service.is_active ? 'Désactiver' : 'Activer'}
-                >
-                  {service.is_active ? '✓' : '✗'}
-                </button>
-                <button 
-                  onClick={() => handleEdit(service)}
-                  className="admin-services-edit-button"
-                >
-                  Modifier
-                </button>
-                <button 
-                  onClick={() => handleDelete(service.id)}
-                  className="admin-services-delete-button"
-                >
-                  Supprimer
-                </button>
+      {services.length === 0 ? (
+        <div className="admin-services-empty">
+          <p>Aucun service disponible. Cliquez sur "Nouveau Service" pour en créer un.</p>
+        </div>
+      ) : (
+        <div className="admin-services-grid">
+          {services.map((service) => {
+            // Get the service name - prioritize multilingual fields, fallback to title
+            const serviceName = service.name_fr || service.name_ar || service.name_en || service.title || 'Service sans nom';
+            
+            // Get the service description - prioritize multilingual fields, fallback to description
+            const serviceDescription = service.description_fr || service.description_ar || service.description_en || service.description || 'Aucune description';
+            
+            return (
+              <div key={service.id} className={`admin-services-card ${!service.is_active ? 'inactive' : ''}`}>
+                <div className="admin-services-card-header">
+                  <span className="admin-services-icon" title={service.icon || 'Icône par défaut'}>
+                    {service.icon || '🏠'}
+                  </span>
+                  <div className="admin-services-actions">
+                    <button 
+                      onClick={() => toggleActive(service)}
+                      className={`admin-services-toggle ${service.is_active ? 'active' : 'inactive'}`}
+                      title={service.is_active ? 'Désactiver' : 'Activer'}
+                    >
+                      {service.is_active ? '✓' : '✗'}
+                    </button>
+                    <button 
+                      onClick={() => handleEdit(service)}
+                      className="admin-services-edit-button"
+                    >
+                      Modifier
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(service.id)}
+                      className="admin-services-delete-button"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
+                <h4 className="admin-services-card-title">{serviceName}</h4>
+                <p className="admin-services-card-description">{serviceDescription}</p>
+                <div className="admin-services-card-meta">
+                  <span className="admin-services-order">Ordre: {service.sort_order || service.order || 0}</span>
+                  <span className={`admin-services-status ${service.is_active ? 'active' : 'inactive'}`}>
+                    {service.is_active ? 'Actif' : 'Inactif'}
+                  </span>
+                </div>
               </div>
-            </div>
-            <h4 className="admin-services-card-title">{service.title}</h4>
-            <p className="admin-services-card-description">{service.description}</p>
-            <div className="admin-services-card-meta">
-              <span className="admin-services-order">Ordre: {service.sort_order}</span>
-              <span className={`admin-services-status ${service.is_active ? 'active' : 'inactive'}`}>
-                {service.is_active ? 'Actif' : 'Inactif'}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

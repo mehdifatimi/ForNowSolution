@@ -626,6 +626,22 @@
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
 }
 
+.admin-services-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin: 20px 0;
+}
+
+.admin-services-empty p {
+  font-size: 16px;
+  margin: 0;
+  color: #64748b;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .admin-services-header {
