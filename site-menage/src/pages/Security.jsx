@@ -576,29 +576,26 @@ export default function Security() {
                 <article 
                   key={role.id || `role-${idx}`}
                   className="security-card role-card" 
-                  data-aos="zoom-in" 
-                  data-aos-delay={`${350 + idx * 80}`}
-                  onClick={() => loadRoleDetails(role.id)}
                   style={{
-                    cursor: 'pointer',
-                    display: 'block',
-                    visibility: 'visible',
-                    opacity: 1
+                    animationDelay: `${0.1 + idx * 0.1}s`
                   }}
                 >
-                  <div className="security-top">
-                    <div>
-                      <h3 className="security-name">
-                        {role.name || getTranslatedRole(role.name) || t('security_page.role_not_available')}
-                      </h3>
-                      <p className="security-role">{t('security_page.click_to_see_agents')}</p>
-                    </div>
-                  </div>
-                  <p className="security-desc">
-                    {role.description || getTranslatedRoleDescription(role.name) || t('security_page.description_not_available')}
-                  </p>
-                  <div className="security-meta">
-                    <span className="security-badge">{t('security_page.security_role')}</span>
+                  <div className="security-card-content">
+                    <h3 className="security-name">
+                      {role.name || getTranslatedRole(role.name) || t('security_page.role_not_available')}
+                    </h3>
+                    <p className="security-desc">
+                      {role.description || getTranslatedRoleDescription(role.name) || t('security_page.description_not_available')}
+                    </p>
+                    <button 
+                      className="security-card-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        loadRoleDetails(role.id);
+                      }}
+                    >
+                      {t('security_page.click_to_see_agents')}
+                    </button>
                   </div>
                 </article>
               );
