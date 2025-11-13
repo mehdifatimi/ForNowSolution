@@ -403,7 +403,7 @@ export default function Home() {
         ) : currentImage && currentImage.image_url ? (
           <div className="hero-background">
             <div 
-              className={`background-image ${isTransitioning ? 'fade-out' : 'fade-in'}`}
+              className="background-image"
               style={{
                 backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${currentImage.image_url})`
               }}

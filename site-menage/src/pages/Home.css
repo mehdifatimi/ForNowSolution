@@ -146,11 +146,28 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     opacity: 1 !important;
   }
   
-  /* Ensure hero content is visible */
+  /* Ensure hero content is visible and stable */
   .home-hero-content {
     visibility: visible !important;
     opacity: 1 !important;
     overflow: visible !important;
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .hero-title,
+  .hero-description {
+    transition: none !important;
+  }
+  
+  .hero-title.fade-in,
+  .hero-title.fade-out,
+  .hero-description.fade-in,
+  .hero-description.fade-out {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
   
   /* Ensure background image is visible */
@@ -158,6 +175,14 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   .background-image {
     visibility: visible !important;
     opacity: 1 !important;
+  }
+  
+  /* Ensure buttons stay in place during image changes - no transitions */
+  .category-buttons-container,
+  .service-buttons-container {
+    transition: none !important;
+    animation: none !important;
+    transform: translateX(-50%) !important;
   }
 }
 
@@ -179,6 +204,28 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
   background-repeat: no-repeat;
   transition: opacity 0.8s ease-in-out;
   will-change: opacity; /* Optimize animation performance */
+}
+
+/* Disable animations and transitions for background-image on mobile */
+@media (max-width: 768px) {
+  .background-image {
+    transition: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+    will-change: auto !important;
+  }
+  
+  .background-image.fade-in,
+  .background-image.fade-out {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+  }
+  
+  .hero-background {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 .background-image.fade-in {
@@ -369,17 +416,23 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     animation: iconFloat 3s ease-in-out infinite !important; /* Force animation on mobile */
   }
   
-  /* Ensure fade animations work on mobile */
+  /* Disable background-image animations on mobile */
+  .background-image.fade-in,
+  .background-image.fade-out {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+  }
+  
+  /* Ensure fade animations work on mobile for other elements */
   .hero-title.fade-in,
   .hero-description.fade-in,
-  .background-image.fade-in,
   .service-button.fade-in {
     animation: fadeIn 0.6s ease-out forwards !important;
   }
   
   .hero-title.fade-out,
   .hero-description.fade-out,
-  .background-image.fade-out,
   .service-button.fade-out {
     animation: fadeOut 0.3s ease-out forwards !important;
   }
@@ -735,6 +788,8 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     justify-content: center;
     overflow: visible;
     -webkit-overflow-scrolling: touch;
+    transition: none !important;
+    animation: none !important;
   }
   
   /* Hide scrollbar on mobile since we're using grid now */
@@ -804,7 +859,15 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     opacity: 1 !important;
     position: relative;
     z-index: 2;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .category-button.fade-in,
+  .category-button.fade-out {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
   }
   
   .category-button.active {
@@ -841,6 +904,18 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     padding: 12px 24px;
     font-size: 14px;
     min-width: 140px;
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .home-primary-button:hover {
+    transform: none !important;
+    transition: none !important;
+  }
+  
+  .home-primary-button:active {
+    transform: none !important;
+    transition: none !important;
   }
   
   .home-primary-button .icon svg {
@@ -989,6 +1064,18 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     font-size: 13px;
     min-width: 130px;
     border-radius: 24px;
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .home-primary-button:hover {
+    transform: none !important;
+    transition: none !important;
+  }
+  
+  .home-primary-button:active {
+    transform: none !important;
+    transition: none !important;
   }
   
   .home-primary-button .icon svg {
@@ -1029,6 +1116,18 @@ h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
     font-size: 13px;
     min-width: 140px;
     min-height: 44px; /* Keep touch-friendly */
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .home-primary-button:hover {
+    transform: none !important;
+    transition: none !important;
+  }
+  
+  .home-primary-button:active {
+    transform: none !important;
+    transition: none !important;
   }
   
   .home-hero {
