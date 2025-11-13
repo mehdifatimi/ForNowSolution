@@ -546,7 +546,6 @@ export default function Navbar1() {
             <li><Link to="/support" onClick={closeMenu}>{isRTL ? 'الدعم' : 'Support'}</Link></li>
             <li><Link to="/gallery" onClick={closeMenu}>{t('nav.gallery')}</Link></li>
             <li><Link to="/info" onClick={closeMenu}>{t('nav.info')}</Link></li>
-            <li><Link to="/temoignages" onClick={closeMenu}>{t('nav.testimonials')}</Link></li>
             {isLoggedIn && (
               <li><Link to="/profile" onClick={closeMenu}>{t('nav.profile')}</Link></li>
             )}

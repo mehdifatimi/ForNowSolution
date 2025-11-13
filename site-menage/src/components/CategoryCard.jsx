@@ -19,12 +19,8 @@ export default function CategoryCard({ category, onClick, index }) {
             alt={category.name}
             className="category-image"
             onError={(e) => {
-              console.log('[CategoryCard] Image failed to load:', category.imageUrl);
               setImageError(true);
               e.target.style.display = 'none';
-            }}
-            onLoad={() => {
-              console.log('[CategoryCard] Image loaded successfully:', category.imageUrl);
             }}
           />
         ) : (

@@ -4,11 +4,11 @@
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.80.0",
-    "ajv": "^8.12.0",
-    "ajv-keywords": "^5.1.0",
+    "ajv": "^8.17.1",
     "aos": "^2.3.4",
     "axios": "^1.12.2",
     "chart.js": "^4.5.1",
+    "cross-env": "^10.1.0",
     "framer-motion": "^12.23.24",
     "html2canvas": "^1.4.1",
     "i18next": "^25.6.0",
@@ -25,7 +25,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "CI=false react-scripts build",
+    "build": "cross-env CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "prebuild": "node scripts/check-env.js",
@@ -48,8 +48,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "devDependencies": {
-    "typescript": "^4.9.5"
   }
 }

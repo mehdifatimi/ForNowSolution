@@ -260,11 +260,6 @@ export default function Services() {
     navigate('/booking');
   };
 
-  // If user hits /services#temoignages, redirect to home hash
-  if (typeof window !== 'undefined' && window.location.hash === '#temoignages') {
-    window.location.replace('/#temoignages');
-  }
-
   if (loading) return <div className="loading-state">{t('services_page.loading')}</div>;
   if (error) return <div className="error-state">{error}</div>;
 

@@ -14,7 +14,6 @@ import ServiceDetails from './pages/ServiceDetails';
 import Booking from './pages/Booking';
 import Contact from './pages/Contact';
 import Support from './pages/Support';
-import Temoignages from './pages/Temoignages';
 import Gallery from './pages/Gallery';
 import Info from './pages/Info';
 import Shop from './pages/Shop';
@@ -51,7 +50,6 @@ import RegisterEmployee1 from './pages/employees/RegisterEmployee1';
 import SecurityRegister from './pages/employees/SecurityRegister';
 import BebeSettingRegister from './pages/employees/BebeSettingRegister';
 import JardinageRegister from './pages/employees/JardinageRegister';
-import AdminJardinageEmployees from './pages/dashbordAdmin/AdminJardinageEmployees';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
@@ -127,7 +125,6 @@ export default function App() {
           <Route path="/services/details/:main/:sub" element={<ServiceTypeDetails />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/support" element={<Support />} />
-          <Route path="/temoignages" element={<Temoignages />} />
           <Route path="/security" element={<Security />} />
           <Route path="/employees/register" element={<RegisterEmployee1 />} />
           {/* Section-specific pages */}

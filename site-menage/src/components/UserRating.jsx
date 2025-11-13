@@ -15,19 +15,12 @@ export default function UserRating() {
     recent_comments: []
   });
   const [allRatings, setAllRatings] = useState([]);
-  const [slideIndex, setSlideIndex] = useState(0);
   // Show all by default (can collapse with Masquer)
   const [showAllComments, setShowAllComments] = useState(true);
-  const autoSlideMs = 4000;
 
   useEffect(() => {
     loadStats();
   }, []);
-
-  // keep slider vars unused now (legacy), grid shows all reviews
-  const visibleCount = 5;
-  const totalComments = stats.recent_comments?.length || 0;
-  const maxIndex = 0;
 
   const loadStats = async () => {
     try {
